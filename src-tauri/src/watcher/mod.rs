@@ -2,4 +2,4 @@
 // Contains notify-based file watching for .org file changes
 
 // TODO: Add file_watcher.rs module when implementing file watching
-// pub mod file_watcher; 
+pub mod file_watcher; 

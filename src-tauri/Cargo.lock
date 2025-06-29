@@ -439,8 +439,10 @@ checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -818,6 +820,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "errno"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
+dependencies = [
+ "libc",
+ "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "fastrand"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
 name = "fdeflate"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -843,6 +861,15 @@ checksum = "38e2275cc4e4fc009b0669731a1e5ab7ebf11f469eaede2bab9309a5b4d6057f"
 dependencies = [
  "memoffset",
  "rustc_version",
+]
+
+[[package]]
+name = "file-id"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bc904b9bbefcadbd8e3a9fb0d464a9b979de6324c03b3c663e8994f46a5be36"
+dependencies = [
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1850,6 +1877,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd945864f07fe9f5371a27ad7b52a172b4b499999f1d97574c9fa68373937e12"
+
+[[package]]
 name = "litemap"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2061,6 +2094,20 @@ dependencies = [
  "mio 0.8.11",
  "walkdir",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "notify-debouncer-full"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb7fd166739789c9ff169e654dc1501373db9d80a4c3f972817c8a4d7cf8f34e"
+dependencies = [
+ "crossbeam-channel",
+ "file-id",
+ "log",
+ "notify",
+ "parking_lot",
+ "walkdir",
 ]
 
 [[package]]
@@ -2350,12 +2397,17 @@ version = "0.1.0"
 dependencies = [
  "log",
  "notify",
+ "notify-debouncer-full",
  "orgize",
+ "regex",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
+ "tempfile",
+ "thiserror 1.0.69",
+ "uuid",
 ]
 
 [[package]]
@@ -2366,6 +2418,8 @@ checksum = "b747231437c1d8e68355427250c167d3e4d94874727923511e4572b7f5fecd51"
 dependencies = [
  "bytecount",
  "cfg-if",
+ "chrono",
+ "indexmap 2.10.0",
  "jetscii",
  "memchr",
  "nom",
@@ -3027,6 +3081,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
 dependencies = [
  "semver",
+]
+
+[[package]]
+name = "rustix"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c71e83d6afe7ff64890ec6b71d6a69bb8a610ab78ce364b3352876bb4c801266"
+dependencies = [
+ "bitflags 2.9.1",
+ "errno",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3801,6 +3868,19 @@ dependencies = [
  "embed-resource",
  "indexmap 2.10.0",
  "toml",
+]
+
+[[package]]
+name = "tempfile"
+version = "3.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8a64e3985349f2441a1a9ef0b853f869006c3855f2cda6862a94d26ebb9d6a1"
+dependencies = [
+ "fastrand",
+ "getrandom 0.3.3",
+ "once_cell",
+ "rustix",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

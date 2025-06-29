@@ -2,4 +2,6 @@
 // Contains task definitions, enums, and related data types
 
 // TODO: Add task.rs module when implementing Task struct
+pub mod task;
+
 // pub mod task; 

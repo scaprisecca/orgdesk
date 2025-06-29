@@ -24,5 +24,15 @@ log = "0.4"
 tauri = { version = "2.6.2", features = [] }
 tauri-plugin-log = "2"
 # OrgDesk specific dependencies
-orgize = "0.10.0-alpha.10"
-notify = "6.0"
+orgize = { version = "0.10.0-alpha.10", features = ["chrono", "indexmap"] }
+notify = "6.1.1"
+thiserror = "1.0.58"
+regex = "1.10.3"
+uuid = { version = "1.8.0", features = ["v4", "serde"] }
+notify-debouncer-full = "0.3.1"
+
+[dev-dependencies]
+tempfile = "3.10.1"
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem
