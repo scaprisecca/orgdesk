@@ -1,0 +1,46 @@
+#+TITLE: Personal Tasks
+#+AUTHOR: Your Name
+
+* TODO [#A] Book dentist appointment :personal:health:
+  SCHEDULED: <2024-01-17 Wed>
+  :PROPERTIES:
+  :Effort: 0.5h
+  :END:
+
+* TODO [#B] Grocery shopping :personal:errands:
+  SCHEDULED: <2024-01-16 Tue 18:00>
+  :PROPERTIES:
+  :Effort: 1h
+  :END:
+
+* DONE [#C] Pay electricity bill :personal:finance:
+  CLOSED: [2024-01-15 Mon 10:00]
+
+* TODO [#A] Read "Atomic Habits" :personal:reading:
+  SCHEDULED: <2024-01-20 Sat 20:00>
+  :PROPERTIES:
+  :Effort: 1h
+  :END:
+
+* TODO [#B] Call mom :personal:family:
+  DEADLINE: <2024-01-21 Sun>
+  :PROPERTIES:
+  :Effort: 0.5h
+  :END:
+
+* TODO [#C] Organize closet :personal:home:
+  SCHEDULED: <2024-01-23 Tue>
+  :PROPERTIES:
+  :Effort: 2h
+  :END:
+
+** TODO [#B] Donate old clothes :personal:charity:
+   SCHEDULED: <2024-01-24 Wed>
+   :PROPERTIES:
+   :Effort: 1h
+   :END:
+
+* SOMEDAY [#B] Learn to play guitar :personal:hobby:
+  :PROPERTIES:
+  :Effort: 5h
+  :END:

@@ -1,0 +1,46 @@
+#+TITLE: Work Tasks
+#+AUTHOR: Your Name
+#+DATE: 2024-01-15
+
+* TODO [#A] Review quarterly reports :work:reports:
+  SCHEDULED: <2024-01-20 Mon>
+  DEADLINE: <2024-01-25 Fri>
+  :PROPERTIES:
+  :Effort: 2h
+  :END:
+
+* TODO [#B] Prepare presentation for client meeting :work:meeting:
+  SCHEDULED: <2024-01-18 Thu 14:00-15:00>
+  :PROPERTIES:
+  :Effort: 3h
+  :END:
+
+* TODO [#C] Update project documentation :work:docs:
+  DEADLINE: <2024-01-22 Mon>
+  :PROPERTIES:
+  :Effort: 1h
+  :END:
+
+* DONE [#A] Send weekly status email :work:email:
+  CLOSED: [2024-01-15 Mon 17:00]
+
+* TODO [#B] Code review for feature branch :work:dev:
+  SCHEDULED: <2024-01-19 Fri>
+  :PROPERTIES:
+  :Effort: 1.5h
+  :END:
+
+** TODO [#C] Fix bug in login module :work:bugfix:
+   SCHEDULED: <2024-01-16 Tue>
+   :PROPERTIES:
+   :Effort: 0.5h
+   :END:
+
+** DONE [#B] Update dependencies :work:maintenance:
+   CLOSED: [2024-01-14 Sun 16:30]
+
+* TODO [#A] Plan team building event :work:hr:
+  DEADLINE: <2024-01-30 Tue>
+  :PROPERTIES:
+  :Effort: 2h
+  :END:

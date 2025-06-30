@@ -1,0 +1,50 @@
+#+TITLE: Project Alpha
+#+AUTHOR: Your Name
+#+PROJECT: alpha
+
+* TODO [#A] Set up development environment :project:setup:
+  SCHEDULED: <2024-01-16 Tue>
+  DEADLINE: <2024-01-18 Thu>
+  :PROPERTIES:
+  :Effort: 4h
+  :END:
+
+* TODO [#B] Design database schema :project:design:
+  SCHEDULED: <2024-01-19 Fri>
+  :PROPERTIES:
+  :Effort: 3h
+  :END:
+
+* TODO [#A] Implement user authentication :project:backend:
+  SCHEDULED: <2024-01-22 Mon>
+  DEADLINE: <2024-01-26 Fri>
+  :PROPERTIES:
+  :Effort: 8h
+  :END:
+
+** TODO [#B] Set up JWT tokens :project:security:
+   SCHEDULED: <2024-01-23 Tue>
+   :PROPERTIES:
+   :Effort: 2h
+   :END:
+
+** TODO [#C] Create login API endpoints :project:api:
+   SCHEDULED: <2024-01-24 Wed>
+   :PROPERTIES:
+   :Effort: 3h
+   :END:
+
+* TODO [#B] Design user interface :project:frontend:
+  SCHEDULED: <2024-01-25 Thu>
+  :PROPERTIES:
+  :Effort: 6h
+  :END:
+
+* DONE [#C] Project kickoff meeting :project:meeting:
+  CLOSED: [2024-01-15 Mon 09:00]
+
+* TODO [#A] Write project documentation :project:docs:
+  DEADLINE: <2024-01-29 Mon>
+  :PROPERTIES:
+  :Effort: 4h
+  :END:
