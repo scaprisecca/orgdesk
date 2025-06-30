@@ -1,4 +1,4 @@
-import React from 'react';
+// Update prompt component
 
 export const UpdatePrompt = ({ onDismiss }: { onDismiss: () => void }) => {
   return (

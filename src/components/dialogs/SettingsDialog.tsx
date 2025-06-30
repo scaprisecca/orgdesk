@@ -1,9 +1,8 @@
-import React from 'react';
-import { useUiSlice, useSettingsSlice } from '../../stores';
+// Settings dialog component
+import { useBoundStore } from '../../stores';
 
 export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  const { isVimMode, toggleVimMode } = useUiSlice();
-  const { watchedFolders, addWatchedFolder } = useSettingsSlice();
+  const { isVimMode, toggleVimMode, watchedFolders, addWatchedFolder } = useBoundStore();
 
   if (!isOpen) return null;
 

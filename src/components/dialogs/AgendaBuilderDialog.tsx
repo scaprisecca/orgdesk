@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { useAgendaSlice } from '../../stores';
+import { useState } from 'react';
+import { useBoundStore } from '../../stores';
 
 export const AgendaBuilderDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [name, setName] = useState('');
-  const addPreset = useAgendaSlice((state: any) => state.addPreset);
+  const addPreset = useBoundStore((state) => state.addPreset);
 
   if (!isOpen) return null;
 

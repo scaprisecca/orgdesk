@@ -1,12 +1,15 @@
-import { create } from 'zustand';
+import type { StateCreator } from 'zustand';
+import type { TasksSlice } from './tasksSlice';
+import type { SettingsSlice } from './settingsSlice';
+import type { UiSlice } from './uiSlice';
 
-interface AgendaPreset {
+export interface AgendaPreset {
   id: string;
   name: string;
   // Define other preset properties here, e.g., date ranges, filters
 }
 
-interface AgendaState {
+export interface AgendaSlice {
   selectedDate: Date;
   presets: AgendaPreset[];
   activePresetId: string | null;
@@ -15,7 +18,12 @@ interface AgendaState {
   setActivePreset: (id: string) => void;
 }
 
-export const useAgendaSlice = create<AgendaState>((set) => ({
+export const createAgendaSlice: StateCreator<
+  AgendaSlice & TasksSlice & SettingsSlice & UiSlice,
+  [],
+  [],
+  AgendaSlice
+> = (set) => ({
   selectedDate: new Date(),
   presets: [
     { id: '1', name: 'Default' },
@@ -27,4 +35,4 @@ export const useAgendaSlice = create<AgendaState>((set) => ({
   addPreset: (preset) =>
     set((state) => ({ presets: [...state.presets, preset] })),
   setActivePreset: (id) => set({ activePresetId: id }),
-})); 
+}); 

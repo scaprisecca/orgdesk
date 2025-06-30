@@ -1,6 +1,9 @@
-import { create } from 'zustand';
+import type { StateCreator } from 'zustand';
+import type { TasksSlice } from './tasksSlice';
+import type { AgendaSlice } from './agendaSlice';
+import type { UiSlice } from './uiSlice';
 
-interface SettingsState {
+export interface SettingsSlice {
   watchedFolders: string[];
   todoStateConfig: {
     todo: string;
@@ -11,8 +14,13 @@ interface SettingsState {
   setTodoStateConfig: (config: { todo: string; done: string }) => void;
 }
 
-export const useSettingsSlice = create<SettingsState>((set) => ({
-  watchedFolders: [],
+export const createSettingsSlice: StateCreator<
+  SettingsSlice & TasksSlice & AgendaSlice & UiSlice,
+  [],
+  [],
+  SettingsSlice
+> = (set) => ({
+  watchedFolders: ['./data'],
   todoStateConfig: {
     todo: 'TODO',
     done: 'DONE',
@@ -26,4 +34,4 @@ export const useSettingsSlice = create<SettingsState>((set) => ({
       watchedFolders: state.watchedFolders.filter((f) => f !== folderPath),
     })),
   setTodoStateConfig: (config) => set({ todoStateConfig: config }),
-})); 
+}); 

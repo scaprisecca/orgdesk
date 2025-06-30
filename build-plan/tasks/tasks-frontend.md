@@ -13,6 +13,9 @@
 - `src/components/AgendaPane.tsx`: The component for the 7-day agenda view.
 - `src/components/modals/QuickCaptureModal.tsx`: Modal for quickly adding new tasks.
 - `src/components/dialogs/RefileDialog.tsx`: Dialog for moving tasks using fuzzy search.
+- `src-tauri/src/main.rs`: Main entry point for the Tauri application, where the file watcher will be initialized.
+- `src-tauri/src/commands.rs`: Rust functions exposed to the frontend, will be updated to handle settings.
+- `src-tauri/src/watcher/file_watcher.rs`: The module responsible for watching file system events.
 - `tailwind.config.js`: Configuration file for Tailwind CSS.
 - `postcss.config.js`: Configuration file for PostCSS, required by Tailwind CSS.
 
@@ -81,4 +84,16 @@
   - [x] 12.1 Implement `getTasks` in `api.ts` and call it to populate the `tasksSlice` on app load.
   - [x] 12.2 Update `tasksSlice` `addTask` action to call the backend and use an optimistic update pattern.
   - [x] 12.3 Implement and connect `updateTask` and `deleteTask` actions in `tasksSlice` with optimistic updates.
-  - [x] 12.4 Implement and connect `getSettings` and `saveSettings` in `api.ts` to sync the `settingsSlice`. 
+  - [x] 12.4 Implement and connect `getSettings` and `saveSettings` in `api.ts` to sync the `settingsSlice`.
+- [x] 13.0 Configure Default Watched Directory
+  - [x] 13.1 In `settingsSlice.ts`, modify the initial state to include `./data` as a default watched folder if no other settings are persisted.
+  - [x] 13.2 Ensure the application can handle an empty or non-existent `data` directory gracefully on first launch.
+- [x] 14.0 Sync Watched Folders with Backend
+  - [x] 14.1 In `src-tauri/src/commands.rs`, create a new Tauri command `update_watched_folders` that accepts a list of folder paths.
+  - [x] 14.2 In `src-tauri/src/main.rs`, register the `update_watched_folders` command with the Tauri application builder.
+  - [x] 14.3 In `src/lib/api.ts`, create a wrapper function to call the `update_watched_folders` command.
+  - [x] 14.4 In `SettingsDialog.tsx` or a root component like `App.tsx`, use a `useEffect` hook to call the new wrapper function whenever the `watchedFolders` in `settingsSlice` change.
+- [x] 15.0 Load All Tasks from Watched Folders
+  - [x] 15.1 Modify the `list_tasks` command in `src-tauri/src/commands.rs` to iterate through all configured watched directories.
+  - [x] 15.2 For each directory, find all `.org` files, parse them, and aggregate the tasks into a single list to be returned to the frontend.
+  - [x] 15.3 Ensure the `Task` type in both the frontend (`tasksSlice.ts`) and backend (`task.rs`) includes a `filePath` property to distinguish tasks from different files. 

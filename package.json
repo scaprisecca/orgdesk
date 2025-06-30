@@ -16,9 +16,12 @@
     "@tauri-apps/api": "^2.6.0",
     "fuse.js": "^7.1.0",
     "lucide-react": "^0.525.0",
+    "org": "^0.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-resizable-panels": "^3.0.3",
+    "tailwindcss-animate": "^1.0.7",
+    "unist-util-visit": "^5.0.0",
     "zustand": "^5.0.6"
   },
   "devDependencies": {

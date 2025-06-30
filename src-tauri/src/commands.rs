@@ -7,9 +7,75 @@ use crate::{
     store::task_store::TaskStore,
 };
 use serde::Serialize;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::State;
+
+#[derive(Debug, Serialize)]
+pub struct FsNode {
+    name: String,
+    path: PathBuf,
+    is_dir: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    children: Option<Vec<FsNode>>,
+}
+
+fn read_dir_recursive(path: &Path) -> Result<Vec<FsNode>, String> {
+    let mut children = vec![];
+    for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let is_dir = path.is_dir();
+
+        let node_children = if is_dir {
+            Some(read_dir_recursive(&path)?)
+        } else {
+            None
+        };
+
+        if is_dir || name.ends_with(".org") {
+            children.push(FsNode {
+                name,
+                path,
+                is_dir,
+                children: node_children,
+            });
+        }
+    }
+    children.sort_by(|a, b| {
+        if a.is_dir && !b.is_dir {
+            std::cmp::Ordering::Less
+        } else if !a.is_dir && b.is_dir {
+            std::cmp::Ordering::Greater
+        } else {
+            a.name.cmp(&b.name)
+        }
+    });
+    Ok(children)
+}
+
+#[tauri::command]
+pub fn read_fs(dir: String) -> Result<FsNode, String> {
+    let path = Path::new(&dir);
+    let name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let children = read_dir_recursive(path)?;
+    Ok(FsNode {
+        name,
+        path: path.to_path_buf(),
+        is_dir: true,
+        children: Some(children),
+    })
+}
 
 // TODO: Implement command handlers for:
 // - createTask
@@ -132,24 +198,59 @@ pub fn delete_task(task_id: String, state: State<AppState>) -> Result<Task, Comm
     Ok(removed_task)
 }
 
+fn find_org_files_recursively(path: &Path, org_files: &mut Vec<PathBuf>) -> Result<(), String> {
+    if path.is_dir() {
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.is_dir() {
+                find_org_files_recursively(&path, org_files)?;
+            } else if OrgParser::is_org_file(&path) {
+                org_files.push(path);
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn list_tasks(
     filter: Option<String>,
+    watched_folders: Vec<String>,
     state: State<AppState>,
 ) -> Result<Vec<Task>, CommandError> {
-    let store = state.store.lock().unwrap();
-    let tasks = store
-        .filter_tasks(|task| {
-            if let Some(filter) = &filter {
-                task.title.contains(filter)
-            } else {
-                true
-            }
-        })
-        .into_iter()
-        .cloned()
-        .collect();
-    Ok(tasks)
+    let parser = &state.parser;
+    let mut all_tasks = Vec::new();
+    let mut org_files = Vec::new();
+
+    for folder in watched_folders {
+        find_org_files_recursively(Path::new(&folder), &mut org_files)
+            .map_err(|e| CommandError::Store(e))?;
+    }
+
+    org_files.sort();
+    org_files.dedup();
+
+    for path in org_files {
+        if let Ok(parsed_file) = parser.parse_file(&path) {
+            let tasks: Vec<Task> = parsed_file
+                .headlines
+                .iter()
+                .map(|headline| {
+                    let mut task: Task = headline.into();
+                    task.file_path = parsed_file.file_path.clone();
+                    task
+                })
+                .collect();
+            all_tasks.extend(tasks);
+        }
+    }
+
+    if let Some(filter_text) = filter {
+        all_tasks.retain(|task| task.title.contains(&filter_text));
+    }
+
+    Ok(all_tasks)
 }
 
 #[tauri::command]
@@ -160,4 +261,17 @@ pub fn get_agenda_range(
 ) -> Result<Vec<Task>, CommandError> {
     // TODO: Implement date parsing and filtering
     Ok(vec![])
+}
+
+#[tauri::command]
+pub fn update_watched_folders(folders: Vec<String>) -> Result<(), String> {
+    // For now, we'll just print the folders to the console.
+    // In a future step, we'll use this to update the file watcher.
+    println!("Received watched folders: {:?}", folders);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_file_content(path: String) -> Result<String, String> {
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
 } 

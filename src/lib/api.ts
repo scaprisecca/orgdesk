@@ -7,10 +7,10 @@ import type { Task } from '../stores';
  * with the core application logic.
  */
 
-export async function getTasks(): Promise<Task[]> {
+export async function getTasks(watchedFolders: string[]): Promise<Task[]> {
   try {
     // Assuming the backend returns data that matches the Task[] structure
-    const tasks = await invoke<Task[]>("list_tasks");
+    const tasks = await invoke<Task[]>("list_tasks", { watchedFolders });
     return tasks;
   } catch (error) {
     console.error("Error invoking list_tasks:", error);
@@ -28,6 +28,15 @@ export async function parseOrgContent(content: string): Promise<any> {
     return result;
   } catch (error) {
     console.error("Error invoking parse_org_content:", error);
+    throw error;
+  }
+}
+
+export async function updateWatchedFolders(folders: string[]): Promise<void> {
+  try {
+    await invoke("update_watched_folders", { folders });
+  } catch (error) {
+    console.error("Error invoking update_watched_folders:", error);
     throw error;
   }
 }

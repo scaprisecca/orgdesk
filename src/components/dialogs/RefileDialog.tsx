@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Fuse from 'fuse.js';
-import { useTasksSlice } from '../../stores';
-import type { Task } from '../../stores';
+// Task type imported but handled by other imports
 
 // Mock data for refile targets for now. In a real app, this would
 // likely come from a list of files or major headlines.

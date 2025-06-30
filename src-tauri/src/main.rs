@@ -25,12 +25,17 @@ fn main() {
             parser,
         })
         .invoke_handler(tauri::generate_handler![
+            commands::hello_from_rust,
+            commands::parse_org_content,
             commands::parse_org_file,
             commands::create_task,
             commands::update_task,
             commands::delete_task,
             commands::list_tasks,
-            commands::get_agenda_range
+            commands::get_agenda_range,
+            commands::update_watched_folders,
+            commands::read_fs,
+            commands::get_file_content
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

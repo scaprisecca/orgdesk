@@ -1,5 +1,8 @@
-import { create } from 'zustand';
+import type { StateCreator } from 'zustand';
 import { getTasks } from '../lib/api';
+import type { SettingsSlice } from './settingsSlice';
+import type { AgendaSlice } from './agendaSlice';
+import type { UiSlice } from './uiSlice';
 
 export interface Task {
   id: string;
@@ -8,9 +11,10 @@ export interface Task {
   children?: Task[];
   scheduled?: string; // YYYY-MM-DD
   deadline?: string; // YYYY-MM-DD
+  filePath?: string;
 }
 
-interface TasksState {
+export interface TasksSlice {
   tasks: Task[];
   fetchTasks: () => Promise<void>;
   addTask: (task: Task) => void;
@@ -42,19 +46,25 @@ const toggleTaskStateRecursively = (tasks: Task[], id: string): Task[] => {
   });
 };
 
-export const useTasksSlice = create<TasksState>((set) => ({
+export const createTasksSlice: StateCreator<
+  TasksSlice & SettingsSlice & AgendaSlice & UiSlice,
+  [],
+  [],
+  TasksSlice
+> = (set, get) => ({
   tasks: [],
   fetchTasks: async () => {
-    const tasks = await getTasks();
+    const watchedFolders = get().watchedFolders;
+    const tasks = await getTasks(watchedFolders);
     set({ tasks });
   },
-  addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
+  addTask: (task) => set((state: TasksSlice) => ({ tasks: [...state.tasks, task] })),
   updateTaskTitle: (id, newTitle) =>
-    set((state) => ({
+    set((state: TasksSlice) => ({
       tasks: updateTaskRecursively(state.tasks, id, newTitle),
     })),
   toggleTaskState: (id) =>
-    set((state) => ({
+    set((state: TasksSlice) => ({
       tasks: toggleTaskStateRecursively(state.tasks, id),
     })),
-})); 
+}); 

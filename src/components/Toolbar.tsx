@@ -1,10 +1,10 @@
-import React from 'react';
+// Toolbar component
 import { Plus, Settings, MoreHorizontal } from 'lucide-react';
-import { useUiSlice } from '../stores';
+import { useBoundStore } from '../stores';
 import { Dropdown, DropdownItem } from './ui/Dropdown';
 
 export const Toolbar = () => {
-  const { openModal } = useUiSlice();
+  const { openModal } = useBoundStore();
 
   return (
     <div className="flex items-center justify-between p-2 bg-gray-200 dark:bg-gray-800 border-b border-gray-300 dark:border-gray-700">

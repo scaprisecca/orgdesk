@@ -4,21 +4,23 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from 'react-resizable-panels';
-import { useUiSlice } from '../../stores';
+import { useBoundStore } from '../../stores';
 
 export const MainLayout = ({
   toolbar,
+  fileExplorer,
   taskList,
   agenda,
 }: {
   toolbar: React.ReactNode;
+  fileExplorer: React.ReactNode;
   taskList: React.ReactNode;
   agenda: React.ReactNode;
 }) => {
-  const { paneSizes, setPaneSizes } = useUiSlice();
+  const { paneSizes, setPaneSizes } = useBoundStore();
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="flex flex-col h-screen bg-background text-foreground">
       <header className="flex-shrink-0">{toolbar}</header>
       <main className="flex-grow">
         <PanelGroup
@@ -26,11 +28,15 @@ export const MainLayout = ({
           onLayout={(sizes: number[]) => setPaneSizes(sizes)}
           className="h-full"
         >
-          <Panel defaultSize={paneSizes[0]} minSize={20}>
+          <Panel defaultSize={paneSizes[0]} minSize={15} collapsible>
+            {fileExplorer}
+          </Panel>
+          <PanelResizeHandle className="w-px bg-border hover:bg-accent transition-colors" />
+          <Panel defaultSize={paneSizes[1]} minSize={30}>
             {taskList}
           </Panel>
-          <PanelResizeHandle className="w-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 transition-colors" />
-          <Panel defaultSize={paneSizes[1]} minSize={30}>
+          <PanelResizeHandle className="w-px bg-border hover:bg-accent transition-colors" />
+          <Panel defaultSize={paneSizes[2]} minSize={20} collapsible>
             {agenda}
           </Panel>
         </PanelGroup>
