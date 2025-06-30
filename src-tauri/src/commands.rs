@@ -3,7 +3,7 @@
 
 use crate::{
     models::task::{Task, TodoState},
-    parser::org_parser::{OrgParser, ParserError},
+    parser::org_parser::{OrgHeadline, OrgParser, ParsedOrgFile, ParserError},
     store::task_store::TaskStore,
 };
 use serde::Serialize;
@@ -79,7 +79,7 @@ pub fn create_task(
     title: String,
     state: State<AppState>,
 ) -> Result<Task, CommandError> {
-    let mut new_task = Task {
+    let new_task = Task {
         id: uuid::Uuid::new_v4(),
         title,
         state: TodoState::Todo,
@@ -94,7 +94,7 @@ pub fn create_task(
     // This is a simplified implementation. In a real app, we would
     // append the new task to an existing or new org file.
     // For now, we'll just add it to the in-memory store.
-    let mut store = state.store.lock().unwrap();
+    let _store = state.store.lock().unwrap();
     // This is not ideal, we should have a proper method for this.
     // store.add_task(new_task.clone());
     

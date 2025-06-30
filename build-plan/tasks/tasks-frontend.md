@@ -1,0 +1,84 @@
+## Relevant Files
+
+- `src/App.tsx`: The main application component. Will be modified to include the core layout and panes.
+- `src/stores/`: Directory for Zustand state management slices.
+- `src/stores/tasksSlice.ts`: Manages the state of tasks, including CRUD operations and optimistic updates.
+- `src/stores/agendaSlice.ts`: Manages the state for the agenda view, including selected dates and presets.
+- `src/stores/uiSlice.ts`: Manages UI state like pane sizes, active modals, and other UI flags.
+- `src/stores/settingsSlice.ts`: Manages user settings, such as watched folders and theme/mode preferences.
+- `src/components/`: Directory for all UI components.
+- `src/components/layout/MainLayout.tsx`: A component that defines the main application structure with resizable panes.
+- `src/components/Toolbar.tsx`: The main application toolbar for global actions.
+- `src/components/TaskListPane.tsx`: The component for displaying the hierarchical task list.
+- `src/components/AgendaPane.tsx`: The component for the 7-day agenda view.
+- `src/components/modals/QuickCaptureModal.tsx`: Modal for quickly adding new tasks.
+- `src/components/dialogs/RefileDialog.tsx`: Dialog for moving tasks using fuzzy search.
+- `tailwind.config.js`: Configuration file for Tailwind CSS.
+- `postcss.config.js`: Configuration file for PostCSS, required by Tailwind CSS.
+
+### Notes
+
+- Unit tests should typically be placed alongside the code files they are testing (e.g., `MyComponent.tsx` and `MyComponent.test.tsx` in the same directory).
+- Use `pnpm exec jest [optional/path/to/test/file]` to run tests. Running without a path executes all tests found by the Jest configuration.
+
+## Tasks
+
+- [x] 1.0 Project Setup & Foundational Dependencies
+  - [x] 1.1 Install Zustand for state management.
+  - [x] 1.2 Install Tailwind CSS and its dependencies (`postcss`, `autoprefixer`) and initialize its configuration.
+  - [x] 1.3 Install `lucide-react` for icons.
+  - [x] 1.4 Install `react-resizable-panels` for the resizable pane layout.
+  - [x] 1.5 Install `Fuse.js` for fuzzy searching in the RefileDialog.
+- [x] 2.0 Implement State Management (Zustand)
+  - [x] 2.1 Create the `stores` directory.
+  - [x] 2.2 Create `tasksSlice.ts` with placeholder state and actions.
+  - [x] 2.3 Create `agendaSlice.ts` with placeholder state and actions.
+  - [x] 2.4 Create `uiSlice.ts` with placeholder state and actions.
+  - [x] 2.5 Create `settingsSlice.ts` with placeholder state and actions.
+  - [x] 2.6 Create a root store (`src/stores/index.ts`) that combines the slices (if needed, or just export all).
+- [x] 3.0 Build Core UI Layout
+  - [x] 3.1 Create `src/components/layout/MainLayout.tsx`.
+  - [x] 3.2 Use `react-resizable-panels` to create a three-pane layout (Toolbar, TaskList, Agenda).
+  - [x] 3.3 Integrate `MainLayout.tsx` into `App.tsx`.
+- [x] 4.0 Implement Core UI Components (Toolbar, TaskListPane, AgendaPane)
+  - [x] 4.1 Create a placeholder `Toolbar.tsx` component.
+  - [x] 4.2 Create a placeholder `TaskListPane.tsx` component.
+  - [x] 4.3 Create a placeholder `AgendaPane.tsx` component.
+  - [x] 4.4 Populate the panes in `MainLayout.tsx` with these placeholder components.
+- [x] 5.0 Implement Modals and Dialogs
+  - [x] 5.1 Create placeholder `QuickCaptureModal.tsx`.
+  - [x] 5.2 Create placeholder `RefileDialog.tsx`.
+  - [x] 5.3 Create placeholder `AgendaBuilderDialog.tsx`.
+  - [x] 5.4 Create placeholder `SettingsDialog.tsx`.
+  - [x] 5.5 Create placeholder `UpdatePrompt.tsx`.
+- [x] 6.0 Integrate with Tauri IPC
+  - [x] 6.1 Create `src/lib/api.ts` to house IPC wrapper functions.
+  - [x] 6.2 Define placeholder functions for communicating with the Rust backend (e.g., `createTask`, `updateTask`).
+- [x] 7.0 Implement Accessibility Features
+  - [x] 7.1 Ensure all interactive elements are keyboard-accessible.
+  - [x] 7.2 Add `aria-` labels to icon-only buttons and controls.
+- [x] 8.0 Implement Toolbar Logic
+  - [x] 8.1 Wire up the 'More' button to a placeholder dropdown menu.
+  - [x] 8.2 Add functionality to the Settings button to open the Settings modal. (Already partially done)
+  - [x] 8.3 Add functionality to the Quick Capture button to open the Quick Capture modal. (Already done)
+- [x] 9.0 Implement TaskListPane UI and Functionality
+  - [x] 9.1 Replace mock task data with data from the `tasksSlice`.
+  - [x] 9.2 Implement rendering of a hierarchical task list (nested tasks).
+  - [x] 9.3 Enable inline editing of task titles.
+  - [x] 9.4 Implement checkbox functionality to toggle task state (TODO/DONE) via `tasksSlice`.
+  - [x] 9.5 Add a quick filter input to filter tasks based on title.
+- [x] 10.0 Implement AgendaPane UI and Functionality
+  - [x] 10.1 Replace mock agenda data with derived data from `tasksSlice` and `agendaSlice`.
+  - [x] 10.2 Implement a 7-day date range selector.
+  - [x] 10.3 Add a dropdown menu to select the active agenda preset.
+  - [x] 10.4 Allow marking tasks as complete directly from the agenda view.
+- [x] 11.0 Implement Modals and Dialog Logic
+  - [x] 11.1 **QuickCaptureModal:** Connect input to state and implement the `addTask` action on submit.
+  - [x] 11.2 **RefileDialog:** Implement fuzzy search with `Fuse.js` using mock data for refile targets.
+  - [x] 11.3 **AgendaBuilderDialog:** Connect inputs to state and implement the `addPreset` action on save.
+  - [x] 11.4 **SettingsDialog:** Connect Vim mode toggle to `uiSlice` and "Add Folder" button to `settingsSlice`.
+- [x] 12.0 Connect State to Tauri Backend
+  - [x] 12.1 Implement `getTasks` in `api.ts` and call it to populate the `tasksSlice` on app load.
+  - [x] 12.2 Update `tasksSlice` `addTask` action to call the backend and use an optimistic update pattern.
+  - [x] 12.3 Implement and connect `updateTask` and `deleteTask` actions in `tasksSlice` with optimistic updates.
+  - [x] 12.4 Implement and connect `getSettings` and `saveSettings` in `api.ts` to sync the `settingsSlice`. 
