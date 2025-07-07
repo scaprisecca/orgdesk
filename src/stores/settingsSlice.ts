@@ -20,7 +20,7 @@ export const createSettingsSlice: StateCreator<
   [],
   SettingsSlice
 > = (set) => ({
-  watchedFolders: ['./data'],
+  watchedFolders: ['data'],
   todoStateConfig: {
     todo: 'TODO',
     done: 'DONE',

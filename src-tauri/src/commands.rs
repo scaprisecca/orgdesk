@@ -12,6 +12,23 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
+/// Helper function to resolve paths relative to the project root
+/// Since Tauri runs from src-tauri/, we need to go up one level to get to the project root
+fn resolve_project_path(relative_path: &str) -> Result<PathBuf, String> {
+    let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
+    
+    // If we're in src-tauri, go up one level to get to project root
+    let project_root = if current_dir.ends_with("src-tauri") {
+        current_dir.parent().unwrap_or(&current_dir).to_path_buf()
+    } else {
+        current_dir
+    };
+    
+    let resolved_path = project_root.join(relative_path);
+    println!("resolve_project_path: '{}' -> {:?}", relative_path, resolved_path);
+    Ok(resolved_path)
+}
+
 #[derive(Debug, Serialize)]
 pub struct FsNode {
     name: String,
@@ -62,13 +79,19 @@ fn read_dir_recursive(path: &Path) -> Result<Vec<FsNode>, String> {
 
 #[tauri::command]
 pub fn read_fs(dir: String) -> Result<FsNode, String> {
-    let path = Path::new(&dir);
+    // Resolve the path relative to the project root
+    let path = resolve_project_path(&dir)?;
+    
+    if !path.exists() {
+        return Err(format!("Directory does not exist: {:?}", path));
+    }
+    
     let name = path
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
-    let children = read_dir_recursive(path)?;
+    let children = read_dir_recursive(&path)?;
     Ok(FsNode {
         name,
         path: path.to_path_buf(),
@@ -224,8 +247,18 @@ pub fn list_tasks(
     let mut org_files = Vec::new();
 
     for folder in watched_folders {
-        find_org_files_recursively(Path::new(&folder), &mut org_files)
+        // Resolve the path relative to the project root
+        let folder_path = resolve_project_path(&folder)
             .map_err(|e| CommandError::Store(e))?;
+        
+        println!("list_tasks: Checking folder: {:?}", folder_path);
+        
+        if folder_path.exists() {
+            find_org_files_recursively(&folder_path, &mut org_files)
+                .map_err(|e| CommandError::Store(e))?;
+        } else {
+            println!("list_tasks: Folder does not exist: {:?}", folder_path);
+        }
     }
 
     org_files.sort();
@@ -273,5 +306,12 @@ pub fn update_watched_folders(folders: Vec<String>) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_file_content(path: String) -> Result<String, String> {
-    std::fs::read_to_string(path).map_err(|e| e.to_string())
+    // If the path is relative, resolve it relative to the project root
+    let resolved_path = if Path::new(&path).is_absolute() {
+        PathBuf::from(path)
+    } else {
+        resolve_project_path(&path)?
+    };
+    
+    std::fs::read_to_string(resolved_path).map_err(|e| e.to_string())
 } 
