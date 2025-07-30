@@ -5,8 +5,7 @@ import { Dropdown, DropdownItem } from './ui/Dropdown';
 import { ChevronDown } from 'lucide-react';
 import { OrgNode } from './OrgNode';
 import { invoke } from '@tauri-apps/api/core';
-import { parse } from 'org';
-import type { Root } from 'org';
+import { parse } from 'orga';
 
 const formatDate = (date: Date) => {
   return date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -31,7 +30,7 @@ type AgendaItemGroup = {
 const NoteView = () => {
   const { secondarySelectedFile, setSecondarySelectedFile } = useBoundStore();
   const [fileList, setFileList] = useState<any[]>([]);
-  const [ast, setAst] = useState<Root | null>(null);
+  const [ast, setAst] = useState<any | null>(null);
   const [error, setError] = useState('');
 
   // Fetch all .org files

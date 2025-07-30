@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useBoundStore } from '../stores';
 import { invoke } from '@tauri-apps/api/core';
-import { parse } from 'org';
-import type { Root } from 'org';
+import { parse } from 'orga';
 import { OrgNode } from './OrgNode';
 
 export const TaskListPane = () => {
   const selectedFile = useBoundStore((state) => state.selectedFile);
-  const [ast, setAst] = useState<Root | null>(null);
+  const [ast, setAst] = useState<any | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {

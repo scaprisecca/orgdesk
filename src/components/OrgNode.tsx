@@ -1,20 +1,21 @@
 // Component for rendering org-mode AST nodes
-import type { Node, Parent } from 'org';
-
-export const OrgNode = ({ node }: { node: Node }) => {
+export const OrgNode = ({ node }: { node: any }) => {
   if (!node || !node.type) {
     return null;
   }
 
-  const children = (node as Parent).children?.map((child: Node, i: number) => (
+  const children = node.children?.map((child: any, i: number) => (
     <OrgNode key={i} node={child} />
   ));
 
   switch (node.type) {
     case 'root':
+    case 'document':
       return <div className="space-y-4">{children}</div>;
     case 'headline':
-      switch (node.level) {
+    case 'heading':
+      const level = node.level || 1;
+      switch (level) {
         case 1:
           return (
             <h1 className="text-2xl font-bold border-b border-border pb-1 mb-2">
@@ -40,11 +41,25 @@ export const OrgNode = ({ node }: { node: Node }) => {
       return <p className="mb-2">{children}</p>;
     case 'list':
       return <ul className="list-disc pl-6 space-y-1 mb-2">{children}</ul>;
+    case 'listItem':
     case 'item':
       return <li>{children}</li>;
     case 'text':
-      return <span>{node.value as string}</span>;
+      return <span>{node.value}</span>;
+    case 'bold':
+      return <strong>{children}</strong>;
+    case 'italic':
+      return <em>{children}</em>;
+    case 'underline':
+      return <u>{children}</u>;
+    case 'strikethrough':
+      return <s>{children}</s>;
+    case 'code':
+      return <code className="bg-muted px-1 rounded">{children}</code>;
+    case 'link':
+      return <a href={node.url} className="text-primary underline">{children || node.url}</a>;
     default:
-      return null; // Don't render unknown nodes
+      // For unknown nodes, try to render children if they exist
+      return children ? <span>{children}</span> : null;
   }
 }; 
