@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAgendaSlice } from '../../stores';
 
 export const AgendaBuilderDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {

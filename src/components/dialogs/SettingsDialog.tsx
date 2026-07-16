@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUiSlice, useSettingsSlice } from '../../stores';
 
 export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {

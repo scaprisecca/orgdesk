@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import {
   Panel,
   PanelGroup,
@@ -11,9 +11,9 @@ export const MainLayout = ({
   taskList,
   agenda,
 }: {
-  toolbar: React.ReactNode;
-  taskList: React.ReactNode;
-  agenda: React.ReactNode;
+  toolbar: ReactNode;
+  taskList: ReactNode;
+  agenda: ReactNode;
 }) => {
   const { paneSizes, setPaneSizes } = useUiSlice();
 

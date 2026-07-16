@@ -1,12 +1,12 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
 export const Dropdown = ({
   trigger,
   children,
 }: {
-  trigger: React.ReactNode;
-  children: React.ReactNode;
+  trigger: ReactNode;
+  children: ReactNode;
 }) => {
   return (
     <DropdownMenu.Root>
@@ -27,7 +27,7 @@ export const DropdownItem = ({
   children,
   onSelect,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onSelect?: () => void;
 }) => {
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTasksSlice } from '../../stores';
 
 export const QuickCaptureModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {

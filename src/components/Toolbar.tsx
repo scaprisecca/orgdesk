@@ -1,4 +1,3 @@
-import React from 'react';
 import { Plus, Settings, MoreHorizontal } from 'lucide-react';
 import { useUiSlice } from '../stores';
 import { Dropdown, DropdownItem } from './ui/Dropdown';

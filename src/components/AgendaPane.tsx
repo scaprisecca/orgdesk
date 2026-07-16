@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTasksSlice } from '../stores/tasksSlice';
 import { useAgendaSlice } from '../stores/agendaSlice';
 import type { Task } from '../stores/tasksSlice';

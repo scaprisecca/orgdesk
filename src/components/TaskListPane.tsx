@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useTasksSlice } from '../stores';
 import type { Task } from '../stores/tasksSlice';
 
@@ -26,7 +27,7 @@ const TaskItem = ({ task, level }: { task: Task, level: number }) => {
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSave();
     } else if (e.key === 'Escape') {
