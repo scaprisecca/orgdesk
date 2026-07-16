@@ -25,7 +25,7 @@ Each finding lists **what's wrong**, **why it matters**, and **how to fix it**, 
 3. In `RefileDialog.tsx` remove the unused `useTasksSlice` and `Task` imports (lines 3–4).
 4. Re-run `pnpm build` until clean.
 
-### C2. Tailwind v3 directives with Tailwind v4 — styling pipeline is broken
+### C2. Tailwind v3 directives with Tailwind v4 — styling pipeline is broken — DONE
 
 `src/index.css:1-3` starts with:
 ```css
