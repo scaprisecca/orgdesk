@@ -47,7 +47,7 @@ but the project uses **Tailwind CSS v4** via `@tailwindcss/postcss` (`package.js
    ```
 4. While you're in `index.css`: the rest of the file is the default Vite starter theme (`:root { color: rgba(255,255,255,.87); background-color: #242424; ... }`, plus button/body rules). These fight with the Tailwind `bg-white dark:bg-gray-800` classes the components use. Strip the starter rules down to just fonts/global resets you actually want.
 
-### C3. Runtime crash: Zustand v5 object selector without `useShallow`
+### C3. Runtime crash: Zustand v5 object selector without `useShallow` — DONE
 
 `src/components/TaskListPane.tsx:8-13`:
 ```ts

@@ -6,12 +6,8 @@ import type { Task } from '../stores/tasksSlice';
 const TaskItem = ({ task, level }: { task: Task, level: number }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
-  const { updateTaskTitle, toggleTaskState } = useTasksSlice(
-    (state) => ({
-      updateTaskTitle: state.updateTaskTitle,
-      toggleTaskState: state.toggleTaskState,
-    }),
-  );
+  const updateTaskTitle = useTasksSlice((state) => state.updateTaskTitle);
+  const toggleTaskState = useTasksSlice((state) => state.toggleTaskState);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
