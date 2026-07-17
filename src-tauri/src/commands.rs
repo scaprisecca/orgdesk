@@ -11,13 +11,6 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
-// TODO: Implement command handlers for:
-// - createTask
-// - updateTask  
-// - deleteTask
-// - listTasks
-// - getAgendaRange
-
 // Placeholder function to ensure compilation
 #[tauri::command]
 pub fn hello_from_rust(name: &str) -> String {

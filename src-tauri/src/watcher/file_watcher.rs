@@ -35,7 +35,7 @@ impl FileWatcher {
                                             Ok(parsed_file) => {
                                                 store.add_tasks_from_file(parsed_file)
                                             }
-                                            Err(e) => eprintln!("Error parsing file: {:?}", e),
+                                            Err(e) => log::error!("Error parsing file: {:?}", e),
                                         }
                                     }
                                     notify::EventKind::Remove(_) => {
@@ -49,7 +49,7 @@ impl FileWatcher {
                         }
                     }
                 }
-                Err(e) => eprintln!("watch error: {:?}", e),
+                Err(e) => log::error!("watch error: {:?}", e),
             },
         )?;
 

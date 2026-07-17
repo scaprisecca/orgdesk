@@ -2399,7 +2399,6 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "orgize",
- "regex",
  "serde",
  "serde_json",
  "tauri",

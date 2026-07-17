@@ -93,13 +93,13 @@ I verified in the orgize 0.10.0-alpha.10 source that a `Headline`'s `text_range(
    Assert after `update_headline` that the notes/child are still present in the file.
 3. Also note `to_org_string()` re-emits properties from a `HashMap`, so property **order is randomized** and formatting is normalized — with Option A restrict the replaced range so this only touches lines you intend to rewrite; long term, preserve the original drawer text unless a property actually changed.
 
-### C5. `parse_org_content` is invoked by the frontend but not registered in the desktop app
+### C5. `parse_org_content` is invoked by the frontend but not registered in the desktop app — DONE
 
 `src/lib/api.ts:27` calls `invoke("parse_org_content", ...)`, but `src-tauri/src/main.rs:27-34` (the real desktop entry point) does **not** register `parse_org_content` — only `lib.rs::run()` does, and that builder never runs on desktop. Any call to `parseOrgContent()` fails at runtime with "command not found".
 
 **Fix:** part of C6 below — consolidate to a single command list that includes everything the frontend calls.
 
-### C6. Two divergent Tauri applications (`main.rs` vs `lib.rs`)
+### C6. Two divergent Tauri applications (`main.rs` vs `lib.rs`) — DONE
 
 `src-tauri/src/main.rs` builds the real app (AppState + 6 commands, no log plugin). `src-tauri/src/lib.rs:9-19` builds a *different* app (3 commands, log plugin, no AppState) that desktop never executes. This has already caused C5 and will keep causing "I added a command but it doesn't work" confusion.
 
@@ -245,11 +245,11 @@ All commands and the watcher callback unwrap the store mutex. One panic while ho
 
 **Fix:** `lock().map_err(|_| CommandError::Store("state lock poisoned".into()))?` in commands; in the watcher callback, log and skip. (Or switch to `parking_lot::Mutex`, which doesn't poison.)
 
-### M6. Dead/junk files and dead dependencies
+### M6. Dead/junk files and dead dependencies — DONE
 
-- `src-tauri/orgtoical_main.rs` is a **saved docs.rs HTML page** (7,000+ lines of HTML with a `.rs` extension) — delete it.
-- Unused crates: `regex`, `log` (backend logs via `eprintln!`), `thiserror` (see M4), `tauri-plugin-log` (only registered in the dead `lib.rs` builder — after C6 it becomes live; then replace `eprintln!` with `log::error!`).
-- `commands.rs:14-19` TODO comment claims handlers are unimplemented; stale relative to reality — update or remove alongside H3.
+- `src-tauri/orgtoical_main.rs` is a **saved docs.rs HTML page** (7,000+ lines of HTML with a `.rs` extension) — delete it. **Done** — deleted.
+- Unused crates: `regex`, `log` (backend logs via `eprintln!`), `thiserror` (see M4), `tauri-plugin-log` (only registered in the dead `lib.rs` builder — after C6 it becomes live; then replace `eprintln!` with `log::error!`). **Done** — `regex` removed (no usages); `tauri-plugin-log` is now live via C6 and `file_watcher.rs`'s two `eprintln!` calls were switched to `log::error!`. `thiserror` intentionally left in place, still unused, pending the `CommandError`/`ParserError` derive work in M4.
+- `commands.rs:14-19` TODO comment claims handlers are unimplemented; stale relative to reality — update or remove alongside H3. **Done** — removed (the handlers already exist below it; H3 tracks making them actually persist).
 
 ### M7. Fake UI elements that mislead during development
 
