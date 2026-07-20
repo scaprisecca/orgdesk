@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TodoState {
     Todo,
     Done,
@@ -19,16 +20,37 @@ pub enum Priority {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: Uuid,
     pub title: String,
     pub state: TodoState,
+    pub level: u8,
     pub tags: Vec<String>,
     pub priority: Option<Priority>,
+    /// ISO `YYYY-MM-DD` (converted from the org timestamp at this
+    /// boundary — see `org_timestamp_to_iso_date`), not the raw
+    /// `<2024-08-01 Thu>` org syntax.
     pub scheduled: Option<String>,
+    /// ISO `YYYY-MM-DD`, see `scheduled`.
     pub deadline: Option<String>,
     pub properties: std::collections::HashMap<String, String>,
     pub file_path: String,
+}
+
+/// Converts an org timestamp's raw text (e.g. `"<2024-08-01 Thu>"` or
+/// `"[2024-08-01 Thu +1w]"`) into a plain ISO `YYYY-MM-DD` string for the
+/// IPC wire format. The date always starts at the same offset right after
+/// the opening bracket, so this doesn't need to re-parse the timestamp
+/// through orgize — it just validates and extracts that substring.
+///
+/// Returns `None` if the text isn't in the expected org timestamp shape;
+/// callers get no date rather than a malformed one.
+fn org_timestamp_to_iso_date(raw: &str) -> Option<String> {
+    let trimmed = raw.trim_start_matches(['<', '[']);
+    let date_part = trimmed.get(0..10)?;
+    chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d").ok()?;
+    Some(date_part.to_string())
 }
 
 /// Fixed namespace for deriving stable task ids (see `Task::new`). The
@@ -86,10 +108,17 @@ impl Task {
             id,
             title: headline.title.clone(),
             state,
+            level: headline.level,
             tags: headline.tags.clone(),
             priority,
-            scheduled: headline.scheduled.clone(),
-            deadline: headline.deadline.clone(),
+            scheduled: headline
+                .scheduled
+                .as_deref()
+                .and_then(org_timestamp_to_iso_date),
+            deadline: headline
+                .deadline
+                .as_deref()
+                .and_then(org_timestamp_to_iso_date),
             properties: headline.properties.clone(),
             file_path: file_path.to_string(),
         }
@@ -128,6 +157,56 @@ mod tests {
             task.id,
             Uuid::parse_str("5b8f2a1e-4b7f-4a1e-9c3a-1234567890ab").unwrap()
         );
+    }
+
+    #[test]
+    fn test_state_serializes_to_screaming_snake_case() {
+        assert_eq!(serde_json::to_string(&TodoState::Todo).unwrap(), "\"TODO\"");
+        assert_eq!(serde_json::to_string(&TodoState::Done).unwrap(), "\"DONE\"");
+        assert_eq!(
+            serde_json::to_string(&TodoState::InProgress).unwrap(),
+            "\"IN_PROGRESS\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TodoState::Someday).unwrap(),
+            "\"SOMEDAY\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TodoState::Canceled).unwrap(),
+            "\"CANCELED\""
+        );
+    }
+
+    #[test]
+    fn test_scheduled_and_deadline_convert_to_iso_dates() {
+        let parser = OrgParser::new();
+        let content = "* TODO Task\n  SCHEDULED: <2024-08-01 Thu> DEADLINE: <2024-08-15 Thu +1w>\n";
+        let headlines = parser.parse_content(content).unwrap();
+
+        let task = Task::new(&headlines[0], "notes.org");
+        assert_eq!(task.scheduled.as_deref(), Some("2024-08-01"));
+        assert_eq!(task.deadline.as_deref(), Some("2024-08-15"));
+    }
+
+    #[test]
+    fn test_task_serializes_file_path_as_camel_case() {
+        let parser = OrgParser::new();
+        let headlines = parser.parse_content("* TODO Task\n").unwrap();
+        let task = Task::new(&headlines[0], "notes.org");
+
+        let json = serde_json::to_value(&task).unwrap();
+        assert_eq!(json.get("filePath").unwrap(), "notes.org");
+        assert!(json.get("file_path").is_none());
+    }
+
+    #[test]
+    fn test_level_is_carried_from_headline() {
+        let parser = OrgParser::new();
+        let content = "* TODO Parent\n** TODO Child\n";
+        let headlines = parser.parse_content(content).unwrap();
+
+        assert_eq!(Task::new(&headlines[0], "notes.org").level, 1);
+        assert_eq!(Task::new(&headlines[1], "notes.org").level, 2);
     }
 
     #[test]

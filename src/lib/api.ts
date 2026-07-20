@@ -16,7 +16,7 @@ export async function getTasks(): Promise<Task[]> {
     console.error("Error invoking list_tasks:", error);
     // Return mock data on error for development purposes
     return [
-      { id: 'mock1', title: 'Mock task from error', state: 'TODO' }
+      { id: 'mock1', title: 'Mock task from error', state: 'TODO', level: 1, tags: [], filePath: '' }
     ];
   }
 }

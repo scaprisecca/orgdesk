@@ -115,7 +115,7 @@ I verified in the orgize 0.10.0-alpha.10 source that a `Headline`'s `text_range(
 
 ## High — core features silently don't work end-to-end
 
-### H1. The IPC data contract is mismatched — backend tasks can't be displayed correctly
+### H1. The IPC data contract is mismatched — backend tasks can't be displayed correctly — DONE
 
 Backend `Task` (`src-tauri/src/models/task.rs:22-32`) vs frontend `Task` (`src/stores/tasksSlice.ts:4-11`):
 

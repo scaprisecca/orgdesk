@@ -13,6 +13,9 @@ export const QuickCaptureModal = ({ isOpen, onClose }: { isOpen: boolean, onClos
         id: new Date().toISOString(), // Temporary ID
         title: title.trim(),
         state: 'TODO',
+        level: 1,
+        tags: [],
+        filePath: '',
       });
       setTitle('');
       onClose();

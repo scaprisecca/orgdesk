@@ -76,6 +76,7 @@ pub fn create_task(
         id: uuid::Uuid::new_v4(),
         title,
         state: TodoState::Todo,
+        level: 1,
         tags: vec![],
         priority: None,
         scheduled: None,
