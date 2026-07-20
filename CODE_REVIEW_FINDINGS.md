@@ -71,7 +71,7 @@ The selector returns a **new object on every call**. With Zustand v5 (which uses
   );
   ```
 
-### C4. Data loss: `OrgParser::update_headline` deletes body text and child headlines
+### C4. Data loss: `OrgParser::update_headline` deletes body text and child headlines — DONE
 
 `src-tauri/src/parser/org_parser.rs:200-216` replaces `old_headline.range` with `new_headline.to_org_string()`.
 

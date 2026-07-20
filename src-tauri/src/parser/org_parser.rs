@@ -60,8 +60,16 @@ pub struct OrgHeadline {
     pub scheduled: Option<String>,
     pub deadline: Option<String>,
     pub properties: HashMap<String, String>,
+    /// Full range of this headline's subtree (header line, planning,
+    /// properties, body text, and any nested child headlines).
     #[serde(skip)]
     pub range: Option<TextRange>,
+    /// Range covering only the header line, planning (SCHEDULED/DEADLINE),
+    /// and properties drawer — i.e. everything `to_org_string()` regenerates.
+    /// This excludes the body section and child headlines, so replacing just
+    /// this range (see `OrgParser::update_headline`) never deletes them.
+    #[serde(skip)]
+    pub header_range: Option<TextRange>,
 }
 
 impl OrgHeadline {
@@ -157,6 +165,16 @@ impl OrgParser {
                     (None, None)
                 };
 
+                // The header ends where the body (SECTION) or the first
+                // child headline begins, whichever comes first; if neither
+                // exists, the headline's own range is just its header.
+                let header_end = h
+                    .section()
+                    .map(|s| s.text_range().start())
+                    .or_else(|| h.headlines().next().map(|child| child.text_range().start()))
+                    .unwrap_or_else(|| h.text_range().end());
+                let header_range = TextRange::new(h.text_range().start(), header_end);
+
                 let headline = OrgHeadline {
                     title: h.title_raw().trim().to_string(),
                     level: h.level() as u8,
@@ -172,6 +190,7 @@ impl OrgParser {
                     deadline,
                     properties,
                     range: Some(h.text_range()),
+                    header_range: Some(header_range),
                 };
                 headlines.push(headline);
             }
@@ -197,22 +216,40 @@ impl OrgParser {
         })
     }
 
+    /// Rewrite a headline's header (title/todo/priority/tags, planning, and
+    /// properties drawer) in place, leaving its body text and any child
+    /// headlines untouched.
+    ///
+    /// This replaces only `header_range`, not the full subtree `range` — the
+    /// latter also covers the body section and nested headlines, and
+    /// replacing it with `to_org_string()` (which only regenerates the
+    /// header) would silently delete that content.
     pub fn update_headline<P: AsRef<Path>>(
         &self,
         file_path: P,
         old_headline: &OrgHeadline,
         new_headline: &OrgHeadline,
     ) -> Result<(), ParserError> {
-        if let Some(range) = old_headline.range {
-            let mut org = orgize::Org::parse(&fs::read_to_string(&file_path)?);
-            org.replace_range(range, &new_headline.to_org_string());
-            fs::write(file_path, org.to_org())?;
-            Ok(())
-        } else {
-            Err(ParserError::Parse(
+        let (Some(header_range), Some(full_range)) =
+            (old_headline.header_range, old_headline.range)
+        else {
+            return Err(ParserError::Parse(
                 "Cannot update headline without a valid range".to_string(),
-            ))
+            ));
+        };
+
+        let mut org = orgize::Org::parse(&fs::read_to_string(&file_path)?);
+        let mut replacement = new_headline.to_org_string();
+        // header_range's end sits right before the body/child content that
+        // follows it, on the same line as the newline that separates them;
+        // preserve that newline unless the header ran to the end of the
+        // subtree (no body, no children).
+        if header_range.end() < full_range.end() {
+            replacement.push('\n');
         }
+        org.replace_range(header_range, &replacement);
+        fs::write(file_path, org.to_org())?;
+        Ok(())
     }
 }
 
@@ -329,6 +366,65 @@ mod tests {
 
         assert_eq!(updated_headline.title, "Updated First task");
         assert_eq!(updated_headline.todo_state, Some("DONE".to_string()));
+
+        fs::remove_file(file_path).unwrap();
+    }
+
+    #[test]
+    fn test_update_headline_preserves_body_text() {
+        let parser = OrgParser::new();
+        let file_content = "* TODO Task\n  Some notes that must survive.\n";
+        let file_path = "test_update_body.org";
+        fs::write(file_path, file_content).unwrap();
+
+        let parsed_file = parser.parse_file(file_path).unwrap();
+        let old_headline = parsed_file.headlines[0].clone();
+
+        let mut new_headline = old_headline.clone();
+        new_headline.title = "Renamed task".to_string();
+
+        parser
+            .update_headline(file_path, &old_headline, &new_headline)
+            .unwrap();
+
+        let updated_content = fs::read_to_string(file_path).unwrap();
+        assert!(updated_content.contains("Renamed task"));
+        assert!(
+            updated_content.contains("Some notes that must survive."),
+            "body text was lost: {updated_content:?}"
+        );
+
+        fs::remove_file(file_path).unwrap();
+    }
+
+    #[test]
+    fn test_update_headline_preserves_child_headlines() {
+        let parser = OrgParser::new();
+        let file_content = "* TODO Parent\n** TODO Child\n";
+        let file_path = "test_update_child.org";
+        fs::write(file_path, file_content).unwrap();
+
+        let parsed_file = parser.parse_file(file_path).unwrap();
+        let old_headline = parsed_file.headlines[0].clone();
+        assert_eq!(old_headline.title, "Parent");
+
+        let mut new_headline = old_headline.clone();
+        new_headline.title = "Renamed parent".to_string();
+
+        parser
+            .update_headline(file_path, &old_headline, &new_headline)
+            .unwrap();
+
+        let updated_content = fs::read_to_string(file_path).unwrap();
+        assert!(updated_content.contains("Renamed parent"));
+        assert!(
+            updated_content.contains("** TODO Child"),
+            "child headline was lost: {updated_content:?}"
+        );
+
+        let reparsed = parser.parse_file(file_path).unwrap();
+        assert_eq!(reparsed.headlines.len(), 2);
+        assert_eq!(reparsed.headlines[1].title, "Child");
 
         fs::remove_file(file_path).unwrap();
     }
