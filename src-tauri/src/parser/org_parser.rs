@@ -70,6 +70,14 @@ pub struct OrgHeadline {
     /// this range (see `OrgParser::update_headline`) never deletes them.
     #[serde(skip)]
     pub header_range: Option<TextRange>,
+    /// This headline's position in the outline: sibling index (1-based) at
+    /// each level from the root down to this headline. E.g. the second
+    /// child of the first top-level headline is `[1, 2]`. Combined with the
+    /// file path, this gives a stable fallback identity for headlines that
+    /// have no `:ID:` property (see `Task::new`) — it survives edits
+    /// elsewhere in the file, though not reordering of preceding siblings.
+    #[serde(skip)]
+    pub path: Vec<usize>,
 }
 
 impl OrgHeadline {
@@ -133,9 +141,20 @@ impl OrgParser {
         };
         let org = config.parse(content);
         let mut headlines = Vec::new();
+        // Tracks the 1-based sibling index seen so far at each outline
+        // depth, so each headline can be tagged with its path from the root.
+        let mut sibling_counts: Vec<usize> = Vec::new();
 
         org.traverse(&mut from_fn(|event| {
             if let Event::Enter(Container::Headline(h)) = event {
+                let level = h.level();
+                if sibling_counts.len() < level {
+                    sibling_counts.resize(level, 0);
+                }
+                sibling_counts.truncate(level);
+                sibling_counts[level - 1] += 1;
+                let path = sibling_counts.clone();
+
                 let tags: Vec<String> = h.tags().map(|tag| tag.to_string()).collect();
 
                 let properties: HashMap<String, String> = h
@@ -177,7 +196,7 @@ impl OrgParser {
 
                 let headline = OrgHeadline {
                     title: h.title_raw().trim().to_string(),
-                    level: h.level() as u8,
+                    level: level as u8,
                     todo_state: h.todo_keyword().map(|s| s.to_string()),
                     tags,
                     priority: h.priority().and_then(|p| {
@@ -191,6 +210,7 @@ impl OrgParser {
                     properties,
                     range: Some(h.text_range()),
                     header_range: Some(header_range),
+                    path,
                 };
                 headlines.push(headline);
             }

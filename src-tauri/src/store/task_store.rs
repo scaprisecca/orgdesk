@@ -1,10 +1,16 @@
 use crate::models::task::Task;
-use crate::parser::org_parser::ParsedOrgFile;
+use crate::parser::org_parser::{OrgHeadline, ParsedOrgFile};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// A task plus the `OrgHeadline` it was parsed from. The headline's
+/// `header_range` is what a command needs to find and rewrite the right
+/// spot in the source file (see `OrgParser::update_headline`) — `Task`
+/// alone, being the IPC-facing struct, doesn't carry that.
+type TaskEntry = (Task, OrgHeadline);
+
 pub struct TaskStore {
-    tasks_by_file: HashMap<String, Vec<Task>>,
+    tasks_by_file: HashMap<String, Vec<TaskEntry>>,
 }
 
 impl TaskStore {
@@ -15,32 +21,45 @@ impl TaskStore {
     }
 
     pub fn add_tasks_from_file(&mut self, parsed_file: ParsedOrgFile) {
-        let tasks = parsed_file
+        let entries = parsed_file
             .headlines
             .iter()
-            .map(|h| {
-                let mut task = Task::from(h);
-                task.file_path = parsed_file.file_path.clone();
-                task
-            })
+            .map(|h| (Task::new(h, &parsed_file.file_path), h.clone()))
             .collect();
         self.tasks_by_file
-            .insert(parsed_file.file_path.clone(), tasks);
+            .insert(parsed_file.file_path.clone(), entries);
     }
 
     pub fn remove_tasks_by_file(&mut self, file_path: &str) -> Option<Vec<Task>> {
-        self.tasks_by_file.remove(file_path)
+        self.tasks_by_file
+            .remove(file_path)
+            .map(|entries| entries.into_iter().map(|(task, _)| task).collect())
     }
 
     pub fn get_task(&self, task_id: Uuid) -> Option<&Task> {
         self.tasks_by_file
             .values()
-            .flat_map(|tasks| tasks.iter())
-            .find(|task| task.id == task_id)
+            .flat_map(|entries| entries.iter())
+            .find(|(task, _)| task.id == task_id)
+            .map(|(task, _)| task)
+    }
+
+    /// The `OrgHeadline` a task was parsed from — the source of the
+    /// `header_range` needed to rewrite it back to disk.
+    pub fn get_headline(&self, task_id: Uuid) -> Option<&OrgHeadline> {
+        self.tasks_by_file
+            .values()
+            .flat_map(|entries| entries.iter())
+            .find(|(task, _)| task.id == task_id)
+            .map(|(_, headline)| headline)
     }
 
     pub fn get_all_tasks(&self) -> Vec<&Task> {
-        self.tasks_by_file.values().flat_map(|tasks| tasks.iter()).collect()
+        self.tasks_by_file
+            .values()
+            .flat_map(|entries| entries.iter())
+            .map(|(task, _)| task)
+            .collect()
     }
 
     pub fn filter_tasks<F>(&self, filter: F) -> Vec<&Task>
@@ -51,8 +70,8 @@ impl TaskStore {
     }
 
     pub fn update_task(&mut self, updated_task: Task) -> Option<Task> {
-        for tasks in self.tasks_by_file.values_mut() {
-            if let Some(task) = tasks.iter_mut().find(|t| t.id == updated_task.id) {
+        for entries in self.tasks_by_file.values_mut() {
+            if let Some((task, _)) = entries.iter_mut().find(|(t, _)| t.id == updated_task.id) {
                 let old_task = std::mem::replace(task, updated_task);
                 return Some(old_task);
             }
@@ -61,9 +80,9 @@ impl TaskStore {
     }
 
     pub fn remove_task(&mut self, task_id: Uuid) -> Option<Task> {
-        for tasks in self.tasks_by_file.values_mut() {
-            if let Some(index) = tasks.iter().position(|t| t.id == task_id) {
-                return Some(tasks.remove(index));
+        for entries in self.tasks_by_file.values_mut() {
+            if let Some(index) = entries.iter().position(|(t, _)| t.id == task_id) {
+                return Some(entries.remove(index).0);
             }
         }
         None
@@ -146,5 +165,37 @@ mod tests {
         let done_tasks = store.filter_tasks(|task| task.state == TodoState::Done);
         assert_eq!(done_tasks.len(), 1);
         assert_eq!(done_tasks[0].title, "Task 2");
+    }
+
+    #[test]
+    fn test_get_headline_for_task() {
+        let store = create_test_store();
+        let task = store.get_all_tasks()[0].clone();
+
+        let headline = store.get_headline(task.id).unwrap();
+        assert_eq!(headline.title, task.title);
+        assert!(headline.header_range.is_some());
+    }
+
+    #[test]
+    fn test_ids_stable_after_reparsing_same_file() {
+        let mut store = create_test_store();
+        let ids_before: Vec<Uuid> = store.get_all_tasks().iter().map(|t| t.id).collect();
+
+        // Simulate a watcher reparse of the same file content.
+        let parser = OrgParser::new();
+        let file_content = "\n* TODO Task 1\n* DONE Task 2\n";
+        let parsed_file = ParsedOrgFile {
+            file_path: "test.org".to_string(),
+            content: file_content.to_string(),
+            headlines: parser.parse_content(file_content).unwrap(),
+        };
+        store.add_tasks_from_file(parsed_file);
+
+        let mut ids_after: Vec<Uuid> = store.get_all_tasks().iter().map(|t| t.id).collect();
+        let mut ids_before_sorted = ids_before.clone();
+        ids_before_sorted.sort();
+        ids_after.sort();
+        assert_eq!(ids_before_sorted, ids_after);
     }
 } 

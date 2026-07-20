@@ -31,8 +31,42 @@ pub struct Task {
     pub file_path: String,
 }
 
-impl From<&OrgHeadline> for Task {
-    fn from(headline: &OrgHeadline) -> Self {
+/// Fixed namespace for deriving stable task ids (see `Task::new`). The
+/// value itself is arbitrary — it only needs to never change, so the same
+/// input always hashes to the same id, and to differ from `uuid`'s built-in
+/// namespaces so OrgDesk ids can't collide with unrelated v5 UUIDs.
+const TASK_ID_NAMESPACE: Uuid = Uuid::from_bytes([
+    0x6f, 0x8f, 0x9b, 0x3a, 0x4b, 0x8b, 0x4c, 0x9a, 0x9a, 0x1a, 0x3b, 0x6e, 0x7f, 0x2d, 0x9c, 0x10,
+]);
+
+impl Task {
+    /// Build a `Task` from a parsed headline with a stable `id`, so the
+    /// same headline maps to the same id across reparses instead of a fresh
+    /// `Uuid::new_v4()` every time (see H2 in the code review).
+    ///
+    /// Identity is derived, in order:
+    /// 1. The headline's own `:ID:` property, if set — parsed directly as a
+    ///    UUID when it already is one (this is what Emacs' `org-id` writes),
+    ///    otherwise hashed into one so any custom string ID is still stable.
+    /// 2. Otherwise, a hash of the file path plus the headline's outline
+    ///    path (sibling-index chain from the root). This survives edits
+    ///    elsewhere in the file, though not reordering of prior siblings —
+    ///    good enough until headlines get real `:ID:`s written back (H3).
+    pub fn new(headline: &OrgHeadline, file_path: &str) -> Self {
+        let id = match headline.properties.get("ID") {
+            Some(raw_id) => Uuid::parse_str(raw_id)
+                .unwrap_or_else(|_| Uuid::new_v5(&TASK_ID_NAMESPACE, raw_id.as_bytes())),
+            None => {
+                let path = headline
+                    .path
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                Uuid::new_v5(&TASK_ID_NAMESPACE, format!("{file_path}#{path}").as_bytes())
+            }
+        };
+
         let state = match headline.todo_state.as_deref() {
             Some("TODO") => TodoState::Todo,
             Some("DONE") => TodoState::Done,
@@ -49,7 +83,7 @@ impl From<&OrgHeadline> for Task {
         };
 
         Task {
-            id: Uuid::new_v4(),
+            id,
             title: headline.title.clone(),
             state,
             tags: headline.tags.clone(),
@@ -57,7 +91,53 @@ impl From<&OrgHeadline> for Task {
             scheduled: headline.scheduled.clone(),
             deadline: headline.deadline.clone(),
             properties: headline.properties.clone(),
-            file_path: String::new(), // Will be set when the task is added to the store
+            file_path: file_path.to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::org_parser::OrgParser;
+
+    #[test]
+    fn test_id_stable_across_reparse_without_id_property() {
+        let parser = OrgParser::new();
+        let content = "* TODO First task\n* TODO Second task\n";
+
+        let first_parse = parser.parse_content(content).unwrap();
+        let second_parse = parser.parse_content(content).unwrap();
+
+        let t1a = Task::new(&first_parse[0], "notes.org");
+        let t1b = Task::new(&second_parse[0], "notes.org");
+        assert_eq!(t1a.id, t1b.id, "same headline should get the same id on reparse");
+
+        let t2 = Task::new(&first_parse[1], "notes.org");
+        assert_ne!(t1a.id, t2.id, "different headlines must not collide");
+    }
+
+    #[test]
+    fn test_id_derived_from_id_property_when_present() {
+        let parser = OrgParser::new();
+        let content = "* TODO Task with id\n  :PROPERTIES:\n  :ID:       5b8f2a1e-4b7f-4a1e-9c3a-1234567890ab\n  :END:\n";
+        let headlines = parser.parse_content(content).unwrap();
+
+        let task = Task::new(&headlines[0], "notes.org");
+        assert_eq!(
+            task.id,
+            Uuid::parse_str("5b8f2a1e-4b7f-4a1e-9c3a-1234567890ab").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_id_differs_across_files() {
+        let parser = OrgParser::new();
+        let content = "* TODO Same title, same position\n";
+        let headlines = parser.parse_content(content).unwrap();
+
+        let task_a = Task::new(&headlines[0], "a.org");
+        let task_b = Task::new(&headlines[0], "b.org");
+        assert_ne!(task_a.id, task_b.id);
     }
 } 

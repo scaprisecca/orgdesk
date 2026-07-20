@@ -140,7 +140,7 @@ Consequences: a `DONE` task never renders as done (`'Done' !== 'DONE'`); the age
 3. Represent hierarchy. Simplest robust approach: keep the backend list flat but add `level: u8` and `parent_id: Option<Uuid>` (or just `level`), and build the tree on the frontend from levels — or send `children` nested from Rust. Either way, both sides must agree.
 4. Mirror the full struct in `tasksSlice.ts` (`tags`, `priority`, `filePath`, `level`). Long term, consider generating TS types from the Rust structs with `ts-rs` or `tauri-specta` so this class of bug can't recur.
 
-### H2. Task IDs change on every parse — update/delete by ID is built on sand
+### H2. Task IDs change on every parse — update/delete by ID is built on sand — DONE
 
 `Task::from(&OrgHeadline)` (`models/task.rs:52`) calls `Uuid::new_v4()` every time. Every file-watcher reparse (`store/task_store.rs:17-29` replaces the whole file's task list) mints all-new IDs. So:
 - Any ID the frontend is holding becomes stale the moment the file changes on disk.
