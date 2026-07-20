@@ -32,10 +32,12 @@ export const Toolbar = () => {
             </button>
           }
         >
-          <DropdownItem onSelect={() => console.log('File > New')}>File &gt; New</DropdownItem>
-          <DropdownItem>File &gt; Open</DropdownItem>
-          <DropdownItem>Edit &gt; Undo</DropdownItem>
-          <DropdownItem>Help &gt; About</DropdownItem>
+          {/* Not wired to any backend command yet — disabled rather than a
+              silent no-op stub (see M7 in the code review). */}
+          <DropdownItem disabled>File &gt; New</DropdownItem>
+          <DropdownItem disabled>File &gt; Open</DropdownItem>
+          <DropdownItem disabled>Edit &gt; Undo</DropdownItem>
+          <DropdownItem disabled>Help &gt; About</DropdownItem>
         </Dropdown>
       </div>
     </div>

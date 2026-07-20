@@ -7,6 +7,22 @@ import type { Task } from '../stores';
  * with the core application logic.
  */
 
+/** The flat shape Rust's `CommandError` serializes to (see M4 in the code review). */
+export interface BackendError {
+  kind: 'Store' | 'Parser' | 'NotFound';
+  message: string;
+}
+
+export function isBackendError(error: unknown): error is BackendError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'kind' in error &&
+    'message' in error &&
+    typeof (error as BackendError).message === 'string'
+  );
+}
+
 export async function getTasks(): Promise<Task[]> {
   return invoke<Task[]>("list_tasks");
 }
@@ -15,8 +31,17 @@ export async function createTask(title: string): Promise<Task> {
   return invoke<Task>('create_task', { title });
 }
 
-export async function updateTask(task: Task): Promise<Task> {
-  return invoke<Task>('update_task', { task });
+/** Partial update applied to an existing task — mirrors Rust's `TaskPatch` (see M4 in the code review). */
+export interface TaskPatch {
+  title?: string;
+  state?: Task['state'];
+  tags?: string[];
+  priority?: Task['priority'];
+  properties?: Task['properties'];
+}
+
+export async function updateTask(taskId: string, patch: TaskPatch): Promise<Task> {
+  return invoke<Task>('update_task', { taskId, patch });
 }
 
 export async function deleteTask(taskId: string): Promise<Task> {

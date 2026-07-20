@@ -7,40 +7,17 @@ use orgize::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
 use std::fs;
 use std::io;
 use std::path::Path;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ParserError {
-    IO(io::Error),
+    #[error("IO error: {0}")]
+    IO(#[from] io::Error),
+    #[error("Parse error: {0}")]
     Parse(String),
-}
-
-impl fmt::Display for ParserError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ParserError::IO(err) => write!(f, "IO error: {}", err),
-            ParserError::Parse(msg) => write!(f, "Parse error: {}", msg),
-        }
-    }
-}
-
-impl Error for ParserError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            ParserError::IO(err) => Some(err),
-            ParserError::Parse(_) => None,
-        }
-    }
-}
-
-impl From<io::Error> for ParserError {
-    fn from(err: io::Error) -> Self {
-        ParserError::IO(err)
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -153,10 +130,10 @@ impl OrgParser {
     /// Parse content string into a list of headlines using orgize
     pub fn parse_content(&self, content: &str) -> Result<Vec<OrgHeadline>, ParserError> {
         let config = ParseConfig {
-            todo_keywords: (
-                vec!["TODO".to_string(), "SOMEDAY".to_string()],
-                vec!["DONE".to_string()],
-            ),
+            // Keyword lists derived from `TodoState::TODO_KEYWORD_TABLE` (see
+            // M2 in the code review) so the parser, `TodoState::as_org_keyword`,
+            // and `TodoState::from_org_keyword` can't drift out of sync.
+            todo_keywords: crate::models::task::TodoState::keyword_lists(),
             ..Default::default()
         };
         let org = config.parse(content);
@@ -396,6 +373,19 @@ mod tests {
         assert!(h4.deadline.is_none());
         assert!(h4.properties.is_empty());
         assert!(h4.range.is_some());
+    }
+
+    #[test]
+    fn test_parse_content_recognizes_in_progress_and_canceled_keywords() {
+        let parser = OrgParser::new();
+        let content = "* IN_PROGRESS Working on it\n* CANCELED Nevermind\n";
+        let headlines = parser.parse_content(content).unwrap();
+
+        assert_eq!(headlines.len(), 2);
+        assert_eq!(headlines[0].todo_state, Some("IN_PROGRESS".to_string()));
+        assert_eq!(headlines[0].title, "Working on it");
+        assert_eq!(headlines[1].todo_state, Some("CANCELED".to_string()));
+        assert_eq!(headlines[1].title, "Nevermind");
     }
 
     #[test]

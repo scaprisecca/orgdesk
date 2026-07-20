@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { MainLayout } from './components/layout/MainLayout';
 import { Toolbar } from './components/Toolbar';
@@ -8,12 +8,10 @@ import { QuickCaptureModal } from './components/modals/QuickCaptureModal';
 import { RefileDialog } from './components/dialogs/RefileDialog';
 import { AgendaBuilderDialog } from './components/dialogs/AgendaBuilderDialog';
 import { SettingsDialog } from './components/dialogs/SettingsDialog';
-import { UpdatePrompt } from './components/ui/UpdatePrompt';
 import { useUiSlice, useTasksSlice, useSettingsSlice } from './stores';
 
 function App() {
   const { activeModal, closeModal } = useUiSlice();
-  const [showUpdatePrompt, setShowUpdatePrompt] = useState(true);
   const fetchTasks = useTasksSlice((state) => state.fetchTasks);
   const taskError = useTasksSlice((state) => state.error);
   const fetchWatchedFolders = useSettingsSlice((state) => state.fetchWatchedFolders);
@@ -65,7 +63,6 @@ function App() {
         isOpen={activeModal === 'Settings'}
         onClose={closeModal}
       />
-      {showUpdatePrompt && <UpdatePrompt onDismiss={() => setShowUpdatePrompt(false)} />}
     </>
   );
 }

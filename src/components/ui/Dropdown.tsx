@@ -26,14 +26,20 @@ export const Dropdown = ({
 export const DropdownItem = ({
   children,
   onSelect,
+  disabled,
 }: {
   children: ReactNode;
   onSelect?: () => void;
+  /** Renders greyed-out and inert — for menu entries with no real backing
+   * feature yet, so testing doesn't chase a click that silently does
+   * nothing (see M7 in the code review). */
+  disabled?: boolean;
 }) => {
   return (
     <DropdownMenu.Item
-      className="text-[13px] leading-none rounded-[3px] flex items-center h-[25px] px-[5px] relative pl-[25px] select-none outline-none text-gray-900 dark:text-gray-100 data-[highlighted]:bg-blue-500 data-[highlighted]:text-white"
+      className="text-[13px] leading-none rounded-[3px] flex items-center h-[25px] px-[5px] relative pl-[25px] select-none outline-none text-gray-900 dark:text-gray-100 data-[highlighted]:bg-blue-500 data-[highlighted]:text-white data-[disabled]:text-gray-400 dark:data-[disabled]:text-gray-500 data-[disabled]:pointer-events-none"
       onSelect={onSelect}
+      disabled={disabled}
     >
       {children}
     </DropdownMenu.Item>

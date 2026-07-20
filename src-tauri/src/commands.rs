@@ -2,16 +2,19 @@
 // Contains all the API endpoints as Tauri commands
 
 use crate::{
-    models::task::{Priority, Task},
+    models::task::{Priority, Task, TodoState},
     parser::org_parser::{OrgHeadline, OrgParser, ParsedOrgFile, ParserError},
     settings::Settings,
     store::task_store::TaskStore,
     watcher::file_watcher::{FileWatcher, TASKS_CHANGED_EVENT},
 };
-use serde::Serialize;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
+use thiserror::Error;
 use uuid::Uuid;
 
 // Placeholder function to ensure compilation
@@ -46,11 +49,35 @@ pub fn parse_org_file(file_path: String) -> Result<ParsedOrgFile, String> {
         .map_err(|e| format!("Failed to parse org file: {}", e))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Error)]
 pub enum CommandError {
+    #[error("{0}")]
     Store(String),
+    #[error("{0}")]
     Parser(String),
+    #[error("{0}")]
     NotFound(String),
+}
+
+/// Serializes to a flat `{ kind, message }` shape (instead of the
+/// `{"Store": "msg"}` / `{"Parser": "msg"}` derive(Serialize) would produce)
+/// so the frontend can handle every variant the same way without matching on
+/// which single key is present (see M4 in the code review).
+impl Serialize for CommandError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let (kind, message) = match self {
+            CommandError::Store(msg) => ("Store", msg.as_str()),
+            CommandError::Parser(msg) => ("Parser", msg.as_str()),
+            CommandError::NotFound(msg) => ("NotFound", msg.as_str()),
+        };
+        let mut state = serializer.serialize_struct("CommandError", 2)?;
+        state.serialize_field("kind", kind)?;
+        state.serialize_field("message", message)?;
+        state.end()
+    }
 }
 
 impl From<ParserError> for CommandError {
@@ -73,6 +100,19 @@ pub struct AppState {
     pub settings_path: PathBuf,
 }
 
+/// Locks `mutex`, turning a poisoned lock into a `CommandError` instead of
+/// panicking. Without this, one panic anywhere while holding a lock (e.g.
+/// from a parser bug) poisons it and every subsequent command panics too,
+/// taking the whole app down (see M5 in the code review).
+fn lock_or_err<'a, T>(
+    mutex: &'a Mutex<T>,
+    name: &str,
+) -> Result<std::sync::MutexGuard<'a, T>, CommandError> {
+    mutex
+        .lock()
+        .map_err(|_| CommandError::Store(format!("{name} lock poisoned")))
+}
+
 /// Persists the in-memory `Settings` to disk, logging (not failing the
 /// command) on error — a save failure shouldn't roll back an
 /// already-applied in-memory change.
@@ -89,10 +129,7 @@ fn persist_settings(state: &AppState, settings: &Settings) {
 /// this keeps a single code path for "write file, then resync store from
 /// disk" across create/update/delete). Returns the newly created task.
 fn create_task_impl(state: &AppState, title: String) -> Result<Task, CommandError> {
-    let inbox_file = state
-        .settings
-        .lock()
-        .unwrap()
+    let inbox_file = lock_or_err(&state.settings, "settings")?
         .inbox_file
         .clone()
         .ok_or_else(|| {
@@ -121,7 +158,7 @@ fn create_task_impl(state: &AppState, title: String) -> Result<Task, CommandErro
             CommandError::Store("Failed to parse the task just written to disk".to_string())
         })?;
 
-    state.store.lock().unwrap().add_tasks_from_file(parsed);
+    lock_or_err(&state.store, "store")?.add_tasks_from_file(parsed);
     Ok(new_task)
 }
 
@@ -136,60 +173,81 @@ pub fn create_task(
     Ok(task)
 }
 
-/// Rewrites the headline `task.id` was parsed from with `task`'s title,
-/// state, tags, and priority, then reparses the file so the store's cached
-/// ranges for every headline in it (not just this one — a rewrite can shift
-/// later headlines' offsets) stay valid for the next edit. Returns the task
-/// as freshly parsed back from disk.
+/// A partial update to an existing task: only fields set to `Some` are
+/// changed, everything else on the headline is left as-is. Takes `task_id`
+/// as a separate parameter (like `delete_task`) rather than a whole `Task`,
+/// so both mutating commands share one id-first convention instead of two
+/// different shapes (see M4 in the code review).
 ///
-/// `scheduled`/`deadline` are deliberately left untouched: `Task` only
-/// carries them as plain ISO dates (see `models::task::org_timestamp_to_iso_date`),
-/// and nothing in the frontend edits them yet, so regenerating an org
-/// timestamp from just a date would silently drop any repeater (`+1w`) or
-/// weekday text already in the file.
-fn update_task_impl(state: &AppState, task: Task) -> Result<Task, CommandError> {
-    let old_headline = state
-        .store
-        .lock()
-        .unwrap()
-        .get_headline(task.id)
+/// `priority` can only be set, not cleared, since that would need a nested
+/// `Option<Option<Priority>>` to distinguish "leave unchanged" from
+/// "clear" — not worth the complexity until the frontend actually needs to
+/// clear a priority. `scheduled`/`deadline` aren't patchable at all yet: see
+/// the note that used to live here, still true — `Task` only carries them as
+/// plain ISO dates, so regenerating an org timestamp from just a date would
+/// silently drop any repeater (`+1w`) or weekday text already in the file.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskPatch {
+    pub title: Option<String>,
+    pub state: Option<TodoState>,
+    pub tags: Option<Vec<String>>,
+    pub priority: Option<Priority>,
+    pub properties: Option<HashMap<String, String>>,
+}
+
+/// Applies `patch` to the headline `task_id` was parsed from, then reparses
+/// the file so the store's cached ranges for every headline in it (not just
+/// this one — a rewrite can shift later headlines' offsets) stay valid for
+/// the next edit. Returns the task as freshly parsed back from disk.
+fn update_task_impl(state: &AppState, task_id: Uuid, patch: TaskPatch) -> Result<Task, CommandError> {
+    let (existing_task, old_headline) = lock_or_err(&state.store, "store")?
+        .get_entry(task_id)
         .cloned()
         .ok_or_else(|| CommandError::NotFound("Task not found".to_string()))?;
 
     let mut new_headline = old_headline.clone();
-    new_headline.title = task.title.clone();
-    // IN_PROGRESS/CANCELED aren't in OrgParser's hardcoded keyword config yet
-    // (see M2 in the code review) so writing them is safe but a later
-    // reparse won't recognize the keyword — it'll be swallowed into the
-    // title text instead of `todo_state`.
-    new_headline.todo_state = Some(task.state.as_org_keyword().to_string());
-    new_headline.tags = task.tags.clone();
-    new_headline.priority = task.priority.as_ref().map(Priority::as_char);
-    new_headline.properties = task.properties.clone();
+    if let Some(title) = patch.title {
+        new_headline.title = title;
+    }
+    if let Some(new_state) = patch.state {
+        new_headline.todo_state = Some(new_state.as_org_keyword().to_string());
+    }
+    if let Some(tags) = patch.tags {
+        new_headline.tags = tags;
+    }
+    if let Some(priority) = patch.priority {
+        new_headline.priority = Some(Priority::as_char(&priority));
+    }
+    if let Some(properties) = patch.properties {
+        new_headline.properties = properties;
+    }
 
     state
         .parser
-        .update_headline(&task.file_path, &old_headline, &new_headline)?;
+        .update_headline(&existing_task.file_path, &old_headline, &new_headline)?;
 
-    let parsed = state.parser.parse_file(&task.file_path)?;
+    let parsed = state.parser.parse_file(&existing_task.file_path)?;
     let updated_task = parsed
         .headlines
         .iter()
         .map(|h| Task::new(h, &parsed.file_path))
-        .find(|t| t.id == task.id);
+        .find(|t| t.id == task_id);
 
-    state.store.lock().unwrap().add_tasks_from_file(parsed);
+    lock_or_err(&state.store, "store")?.add_tasks_from_file(parsed);
 
     updated_task.ok_or_else(|| CommandError::NotFound("Task not found after update".to_string()))
 }
 
 #[tauri::command]
 pub fn update_task(
-    task: Task,
+    task_id: String,
+    patch: TaskPatch,
     app_handle: AppHandle,
     state: State<AppState>,
 ) -> Result<Task, CommandError> {
-    let updated = update_task_impl(&state, task)?;
+    let uuid = Uuid::parse_str(&task_id).map_err(|e| CommandError::Parser(e.to_string()))?;
+    let updated = update_task_impl(&state, uuid, patch)?;
     let _ = app_handle.emit(TASKS_CHANGED_EVENT, ());
     Ok(updated)
 }
@@ -200,7 +258,7 @@ pub fn update_task(
 /// refreshed for future edits.
 fn delete_task_impl(state: &AppState, task_id: Uuid) -> Result<Task, CommandError> {
     let (removed_task, headline) = {
-        let store = state.store.lock().unwrap();
+        let store = lock_or_err(&state.store, "store")?;
         store
             .get_entry(task_id)
             .cloned()
@@ -210,7 +268,7 @@ fn delete_task_impl(state: &AppState, task_id: Uuid) -> Result<Task, CommandErro
     state.parser.delete_headline(&removed_task.file_path, &headline)?;
 
     let parsed = state.parser.parse_file(&removed_task.file_path)?;
-    state.store.lock().unwrap().add_tasks_from_file(parsed);
+    lock_or_err(&state.store, "store")?.add_tasks_from_file(parsed);
 
     Ok(removed_task)
 }
@@ -232,7 +290,7 @@ pub fn list_tasks(
     filter: Option<String>,
     state: State<AppState>,
 ) -> Result<Vec<Task>, CommandError> {
-    let store = state.store.lock().unwrap();
+    let store = lock_or_err(&state.store, "store")?;
     let tasks = store
         .filter_tasks(|task| {
             if let Some(filter) = &filter {
@@ -265,7 +323,7 @@ fn get_agenda_range_impl(
     let end = chrono::NaiveDate::parse_from_str(end_date, "%Y-%m-%d")
         .map_err(|e| CommandError::Parser(format!("Invalid end_date: {}", e)))?;
 
-    let store = state.store.lock().unwrap();
+    let store = lock_or_err(&state.store, "store")?;
     let tasks = store
         .filter_tasks(|task| {
             task.scheduled
@@ -301,14 +359,14 @@ pub fn add_watched_folder(
     app_handle: AppHandle,
     state: State<AppState>,
 ) -> Result<Vec<String>, CommandError> {
-    let mut watcher = state.watcher.lock().unwrap();
+    let mut watcher = lock_or_err(&state.watcher, "watcher")?;
     watcher
         .add_watched_folder(Path::new(&path))
         .map_err(|e| CommandError::Store(e.to_string()))?;
 
     let folders = watcher.watched_folders();
     {
-        let mut settings = state.settings.lock().unwrap();
+        let mut settings = lock_or_err(&state.settings, "settings")?;
         settings.watched_folders = folders.clone();
         persist_settings(&state, &settings);
     }
@@ -325,12 +383,12 @@ pub fn remove_watched_folder(
     app_handle: AppHandle,
     state: State<AppState>,
 ) -> Result<Vec<String>, CommandError> {
-    let mut watcher = state.watcher.lock().unwrap();
+    let mut watcher = lock_or_err(&state.watcher, "watcher")?;
     watcher.remove_watched_folder(Path::new(&path));
 
     let folders = watcher.watched_folders();
     {
-        let mut settings = state.settings.lock().unwrap();
+        let mut settings = lock_or_err(&state.settings, "settings")?;
         settings.watched_folders = folders.clone();
         persist_settings(&state, &settings);
     }
@@ -340,17 +398,17 @@ pub fn remove_watched_folder(
 
 #[tauri::command]
 pub fn get_watched_folders(state: State<AppState>) -> Result<Vec<String>, CommandError> {
-    Ok(state.watcher.lock().unwrap().watched_folders())
+    Ok(lock_or_err(&state.watcher, "watcher")?.watched_folders())
 }
 
 #[tauri::command]
 pub fn get_inbox_file(state: State<AppState>) -> Result<Option<String>, CommandError> {
-    Ok(state.settings.lock().unwrap().inbox_file.clone())
+    Ok(lock_or_err(&state.settings, "settings")?.inbox_file.clone())
 }
 
 #[tauri::command]
 pub fn set_inbox_file(path: String, state: State<AppState>) -> Result<(), CommandError> {
-    let mut settings = state.settings.lock().unwrap();
+    let mut settings = lock_or_err(&state.settings, "settings")?;
     settings.inbox_file = Some(path);
     persist_settings(&state, &settings);
     Ok(())
@@ -361,6 +419,14 @@ mod tests {
     use super::*;
     use crate::models::task::TodoState;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_command_error_serializes_to_flat_kind_message_shape() {
+        let err = CommandError::NotFound("Task not found".to_string());
+        let json = serde_json::to_value(&err).unwrap();
+        assert_eq!(json.get("kind").unwrap(), "NotFound");
+        assert_eq!(json.get("message").unwrap(), "Task not found");
+    }
 
     /// An `AppState` wired the same way `lib.rs::run()` wires it (store and
     /// parser shared with the watcher), but with no folders watched — these
@@ -425,11 +491,14 @@ mod tests {
             .lock()
             .unwrap()
             .add_tasks_from_file(parsed.clone());
-        let mut task = Task::new(&parsed.headlines[0], &parsed.file_path);
+        let task = Task::new(&parsed.headlines[0], &parsed.file_path);
 
-        task.title = "Renamed task".to_string();
-        task.state = TodoState::Done;
-        let updated = update_task_impl(&state, task).unwrap();
+        let patch = TaskPatch {
+            title: Some("Renamed task".to_string()),
+            state: Some(TodoState::Done),
+            ..Default::default()
+        };
+        let updated = update_task_impl(&state, task.id, patch).unwrap();
 
         assert_eq!(updated.title, "Renamed task");
         assert_eq!(updated.state, TodoState::Done);
@@ -467,7 +536,7 @@ mod tests {
         // and confirm the refreshed entry is still valid for a further edit
         // — i.e. `delete_task_impl`'s reparse actually updated it, rather
         // than leaving a stale range/id behind.
-        let mut third_task = state
+        let third_task = state
             .store
             .lock()
             .unwrap()
@@ -477,8 +546,11 @@ mod tests {
             .cloned()
             .expect("Third should survive the delete with a refreshed entry");
 
-        third_task.title = "Renamed third".to_string();
-        let updated = update_task_impl(&state, third_task).unwrap();
+        let patch = TaskPatch {
+            title: Some("Renamed third".to_string()),
+            ..Default::default()
+        };
+        let updated = update_task_impl(&state, third_task.id, patch).unwrap();
         assert_eq!(updated.title, "Renamed third");
 
         let content = std::fs::read_to_string(&file_path).unwrap();

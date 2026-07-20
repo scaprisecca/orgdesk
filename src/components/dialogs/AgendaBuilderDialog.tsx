@@ -3,7 +3,7 @@ import { useAgendaSlice } from '../../stores';
 
 export const AgendaBuilderDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [name, setName] = useState('');
-  const addPreset = useAgendaSlice((state: any) => state.addPreset);
+  const addPreset = useAgendaSlice((state) => state.addPreset);
 
   if (!isOpen) return null;
 

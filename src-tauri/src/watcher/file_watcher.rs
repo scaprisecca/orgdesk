@@ -75,7 +75,13 @@ impl FileWatcher {
                     for event in events {
                         for path in &event.event.paths {
                             if OrgParser::is_org_file(path) {
-                                let mut store = task_store_clone.lock().unwrap();
+                                let mut store = match task_store_clone.lock() {
+                                    Ok(store) => store,
+                                    Err(e) => {
+                                        log::error!("Task store lock poisoned, skipping event: {:?}", e);
+                                        continue;
+                                    }
+                                };
                                 match event.event.kind {
                                     notify::EventKind::Create(_)
                                     | notify::EventKind::Modify(_) => {
@@ -125,12 +131,10 @@ impl FileWatcher {
 
         for file in Self::scan_org_files(&canonical) {
             match self.parser.parse_file(&file) {
-                Ok(parsed_file) => {
-                    self.task_store
-                        .lock()
-                        .unwrap()
-                        .add_tasks_from_file(parsed_file);
-                }
+                Ok(parsed_file) => match self.task_store.lock() {
+                    Ok(mut store) => store.add_tasks_from_file(parsed_file),
+                    Err(e) => log::error!("Task store lock poisoned, skipping {:?}: {:?}", file, e),
+                },
                 Err(e) => log::error!("Error parsing {:?}: {:?}", file, e),
             }
         }
@@ -157,10 +161,10 @@ impl FileWatcher {
         }
 
         let prefix = canonical.to_string_lossy().to_string();
-        self.task_store
-            .lock()
-            .unwrap()
-            .remove_tasks_by_folder(&prefix);
+        match self.task_store.lock() {
+            Ok(mut store) => store.remove_tasks_by_folder(&prefix),
+            Err(e) => log::error!("Task store lock poisoned, skipping removal of {:?}: {:?}", canonical, e),
+        }
     }
 
     pub fn watched_folders(&self) -> Vec<String> {

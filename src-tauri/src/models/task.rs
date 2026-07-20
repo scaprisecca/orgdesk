@@ -12,18 +12,55 @@ pub enum TodoState {
     Canceled,
 }
 
+/// Single source of truth for the org todo keywords this app recognizes: the
+/// keyword text, the `TodoState` it maps to, and whether it counts as
+/// "done". `OrgParser::parse_content`'s `ParseConfig` keyword lists,
+/// `TodoState::as_org_keyword`, and `TodoState::from_org_keyword` all derive
+/// from this table so the three can't drift out of sync (see M2 in the code
+/// review — previously the parser only recognized TODO/SOMEDAY/DONE, so
+/// IN_PROGRESS/CANCELED could never be produced even though `TodoState` had
+/// variants for them).
+pub const TODO_KEYWORD_TABLE: &[(&str, TodoState, bool)] = &[
+    ("TODO", TodoState::Todo, false),
+    ("IN_PROGRESS", TodoState::InProgress, false),
+    ("SOMEDAY", TodoState::Someday, false),
+    ("DONE", TodoState::Done, true),
+    ("CANCELED", TodoState::Canceled, true),
+];
+
 impl TodoState {
-    /// The org todo keyword this state round-trips to, matching the parsing
-    /// in `Task::new`'s `match headline.todo_state.as_deref()`. Used when
-    /// writing a task's state back into an `OrgHeadline` for `update_task`.
+    /// The org todo keyword this state round-trips to. Used when writing a
+    /// task's state back into an `OrgHeadline` for `update_task`.
     pub fn as_org_keyword(&self) -> &'static str {
-        match self {
-            TodoState::Todo => "TODO",
-            TodoState::Done => "DONE",
-            TodoState::InProgress => "IN_PROGRESS",
-            TodoState::Someday => "SOMEDAY",
-            TodoState::Canceled => "CANCELED",
+        TODO_KEYWORD_TABLE
+            .iter()
+            .find(|(_, state, _)| state == self)
+            .map(|(keyword, _, _)| *keyword)
+            .expect("every TodoState variant has a TODO_KEYWORD_TABLE entry")
+    }
+
+    /// The `TodoState` a parsed org todo keyword maps to, or `None` if it
+    /// isn't one of the keywords this app recognizes.
+    pub fn from_org_keyword(keyword: &str) -> Option<Self> {
+        TODO_KEYWORD_TABLE
+            .iter()
+            .find(|(k, _, _)| *k == keyword)
+            .map(|(_, state, _)| state.clone())
+    }
+
+    /// The `(not-done, done)` keyword lists `ParseConfig::todo_keywords`
+    /// needs, derived from `TODO_KEYWORD_TABLE`.
+    pub fn keyword_lists() -> (Vec<String>, Vec<String>) {
+        let mut not_done = Vec::new();
+        let mut done = Vec::new();
+        for (keyword, _, is_done) in TODO_KEYWORD_TABLE {
+            if *is_done {
+                done.push(keyword.to_string());
+            } else {
+                not_done.push(keyword.to_string());
+            }
         }
+        (not_done, done)
     }
 }
 
@@ -116,14 +153,11 @@ impl Task {
             }
         };
 
-        let state = match headline.todo_state.as_deref() {
-            Some("TODO") => TodoState::Todo,
-            Some("DONE") => TodoState::Done,
-            Some("IN_PROGRESS") => TodoState::InProgress,
-            Some("SOMEDAY") => TodoState::Someday,
-            Some("CANCELED") => TodoState::Canceled,
-            _ => TodoState::Todo, // Default state
-        };
+        let state = headline
+            .todo_state
+            .as_deref()
+            .and_then(TodoState::from_org_keyword)
+            .unwrap_or(TodoState::Todo); // Default state (also covers no-keyword headlines)
         let priority = match headline.priority {
             Some('A') => Some(Priority::A),
             Some('B') => Some(Priority::B),
@@ -247,11 +281,13 @@ mod tests {
 
     #[test]
     fn test_todo_state_round_trips_through_org_keyword() {
-        // IN_PROGRESS/CANCELED aren't in `OrgParser`'s hardcoded keyword
-        // config yet (see M2 in the code review), so they can't round-trip
-        // through a real parse — only assert the states it currently
-        // recognizes as todo keywords.
-        for state in [TodoState::Todo, TodoState::Done, TodoState::Someday] {
+        for state in [
+            TodoState::Todo,
+            TodoState::Done,
+            TodoState::InProgress,
+            TodoState::Someday,
+            TodoState::Canceled,
+        ] {
             let keyword = state.as_org_keyword();
             let content = format!("* {} Task\n", keyword);
             let headlines = OrgParser::new().parse_content(&content).unwrap();

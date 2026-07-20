@@ -1,25 +1,37 @@
 import { useState, useMemo } from 'react';
 import Fuse from 'fuse.js';
+import { useTasksSlice } from '../../stores';
+import type { Task } from '../../stores';
 
-// Mock data for refile targets for now. In a real app, this would
-// likely come from a list of files or major headlines.
-const refileTargets = [
-  { id: 'file1', title: 'work.org' },
-  { id: 'file2', title: 'home.org' },
-  { id: 'file3', title: 'project-alpha.org' },
-];
-
-const fuse = new Fuse(refileTargets, {
-  keys: ['title'],
-  includeScore: true,
-});
+/** Every distinct source file among currently loaded tasks — real backend
+ * data instead of a hardcoded fake file list (see M7 in the code review). */
+const collectFilePaths = (tasks: Task[]): string[] => {
+  const paths = new Set<string>();
+  const visit = (list: Task[]) => {
+    for (const task of list) {
+      paths.add(task.filePath);
+      if (task.children) visit(task.children);
+    }
+  };
+  visit(tasks);
+  return Array.from(paths).sort();
+};
 
 export const RefileDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [query, setQuery] = useState('');
+  const tasks = useTasksSlice((state) => state.tasks);
+  const refileTargets = useMemo(
+    () => collectFilePaths(tasks).map((path) => ({ id: path, title: path })),
+    [tasks],
+  );
+  const fuse = useMemo(
+    () => new Fuse(refileTargets, { keys: ['title'], includeScore: true }),
+    [refileTargets],
+  );
   const results = useMemo(() => {
     if (!query) return [];
     return fuse.search(query);
-  }, [query]);
+  }, [query, fuse]);
 
   if (!isOpen) return null;
 

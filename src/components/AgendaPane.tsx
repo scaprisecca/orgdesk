@@ -5,7 +5,14 @@ import { Dropdown, DropdownItem } from './ui/Dropdown';
 import { ChevronDown } from 'lucide-react';
 
 const formatDate = (date: Date) => {
-  return date.toISOString().split('T')[0]; // YYYY-MM-DD
+  // Local date parts, not UTC — `toISOString()` converts to UTC first, which
+  // in negative-offset timezones (e.g. UTC-7) shifts "today" to tomorrow's
+  // date from early evening onward, mismatching every scheduled/deadline
+  // comparison below (see M3 in the code review).
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const getWeekDays = (startDate: Date): Date[] => {

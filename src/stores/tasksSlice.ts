@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getTasks, createTask, updateTask, deleteTask } from '../lib/api';
+import { getTasks, createTask, updateTask, deleteTask, isBackendError } from '../lib/api';
 
 export type TodoState = 'TODO' | 'DONE' | 'IN_PROGRESS' | 'SOMEDAY' | 'CANCELED';
 
@@ -95,8 +95,11 @@ const removeTaskRecursively = (tasks: Task[], id: string): Task[] => {
     .map(task => (task.children ? { ...task, children: removeTaskRecursively(task.children, id) } : task));
 };
 
-const errorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error ? error.message : fallback;
+const errorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) return error.message;
+  if (isBackendError(error)) return error.message;
+  return fallback;
+};
 
 export const useTasksSlice = create<TasksState>((set, get) => ({
   tasks: [],
@@ -127,7 +130,7 @@ export const useTasksSlice = create<TasksState>((set, get) => ({
       error: null,
     });
     try {
-      await updateTask({ ...task, title: newTitle });
+      await updateTask(id, { title: newTitle });
     } catch (error) {
       set({ tasks: previousTasks, error: errorMessage(error, 'Failed to update task') });
     }
@@ -143,7 +146,7 @@ export const useTasksSlice = create<TasksState>((set, get) => ({
       error: null,
     });
     try {
-      await updateTask({ ...task, state: newState });
+      await updateTask(id, { state: newState });
     } catch (error) {
       set({ tasks: previousTasks, error: errorMessage(error, 'Failed to update task') });
     }

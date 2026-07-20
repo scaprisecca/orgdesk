@@ -221,13 +221,15 @@ The debouncer callback (`watcher/file_watcher.rs:26-53`) updates the store but n
 
 ## Medium — correctness and design issues to fix soon
 
-### M1. Every non-TODO headline becomes a TODO task
+### M1. Every non-TODO headline becomes a TODO task — DONE
 
 `models/task.rs:36-43`: a headline with **no** todo keyword defaults to `TodoState::Todo`. In an app whose point is notes + tasks in the same files, every plain note headline will show up as an open task.
 
 **Fix:** make `Task.state: Option<TodoState>` (or add a `TodoState::None`), or only materialize `Task`s for headlines where `todo_state.is_some()` in `TaskStore::add_tasks_from_file` — depends on whether the task pane should show note headlines at all. Frontend `state` type must follow (H1).
 
-### M2. TODO keyword configuration is inconsistent in three places
+**Done** — `TaskStore::add_tasks_from_file` now filters to `h.todo_state.is_some()` before building `Task`s, so plain note headlines (no TODO/DONE/... keyword) are parsed (still available via `OrgHeadline` for future note-viewing features) but never materialize as tasks. New regression test `test_plain_note_headlines_are_not_materialized_as_tasks`.
+
+### M2. TODO keyword configuration is inconsistent in three places — DONE
 
 - Parser hardcodes `["TODO", "SOMEDAY"] / ["DONE"]` (`org_parser.rs:119-125`), so `IN_PROGRESS` and `CANCELED` are never recognized as keywords (they end up inside the title text).
 - `TodoState` enum has `InProgress`/`Canceled` that can therefore never be produced.
@@ -235,7 +237,9 @@ The debouncer callback (`watcher/file_watcher.rs:26-53`) updates the store but n
 
 **Fix:** define the keyword sets once in Rust (eventually loaded from settings), pass them into `ParseConfig`, and map keyword → `TodoState` from that same table. Add a parser test with `IN_PROGRESS`.
 
-### M3. Timezone bug in agenda date formatting
+**Done** — `models/task.rs` now has a single `TODO_KEYWORD_TABLE: &[(&str, TodoState, bool)]` const listing every recognized keyword, its `TodoState`, and whether it counts as done. `OrgParser::parse_content`'s `ParseConfig` now builds its `(not_done, done)` keyword lists from `TodoState::keyword_lists()` (derived from the table) instead of the old hardcoded `["TODO","SOMEDAY"]`/`["DONE"]`, so `IN_PROGRESS`/`CANCELED` are now recognized as real todo keywords. `TodoState::as_org_keyword` and the new `TodoState::from_org_keyword` both look up the same table instead of separate hardcoded matches, so all three can't drift again. New parser test `test_parse_content_recognizes_in_progress_and_canceled_keywords`; the existing `test_todo_state_round_trips_through_org_keyword` now covers all 5 states instead of only 3. `settingsSlice.todoStateConfig` (the third inconsistent set the finding mentions) is left as-is — it's still unwired scaffolding for a future settings-driven keyword config, out of scope for this Rust-side unification.
+
+### M3. Timezone bug in agenda date formatting — DONE
 
 `AgendaPane.tsx:8-10` uses `date.toISOString().split('T')[0]`, which converts to **UTC**. In any negative-offset timezone (e.g. Phoenix, UTC-7), from 5pm onward "today" formats as tomorrow's date, so the agenda highlights and matches the wrong day.
 
@@ -245,18 +249,24 @@ const formatDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 ```
 
-### M4. `update_task`/`delete_task` API inconsistency and error ergonomics
+**Done** — `AgendaPane.tsx`'s `formatDate` now builds the string from `getFullYear`/`getMonth`/`getDate` (local time) exactly as suggested, instead of `toISOString().split('T')[0]` (UTC).
+
+### M4. `update_task`/`delete_task` API inconsistency and error ergonomics — DONE
 
 - `update_task` takes a whole `Task`, `delete_task` takes `task_id: String` — pick one convention (id + patch object is typical).
 - `CommandError` (`commands.rs:53-58`) has no `Display`/`std::error::Error` impl and serializes as `{"Store": "msg"}` / `{"Parser": "msg"}` — awkward to handle in TS. `thiserror` is already in `Cargo.toml` but unused.
 
 **Fix:** convert `CommandError` and `ParserError` to `thiserror` derives; implement `Serialize` to a flat `{ kind, message }` shape; handle that shape in `api.ts`.
 
-### M5. `Mutex::lock().unwrap()` everywhere
+**Done** — `update_task` now takes `(task_id: String, patch: TaskPatch)`, matching `delete_task`'s `task_id`-first convention (`commands.rs`'s new `TaskPatch` struct has `Option` fields for title/state/tags/priority/properties — only the ones set are changed; `update_task_impl` looks the existing entry up via `TaskStore::get_entry` the same way `delete_task_impl` already did). `ParserError` and `CommandError` are now `#[derive(thiserror::Error)]` instead of hand-written `Display`/`Error`/`From` impls. `CommandError` gets a hand-written `Serialize` (thiserror doesn't derive that) producing `{ "kind": "Store" | "Parser" | "NotFound", "message": "..." }` instead of the old `{"Store": "msg"}` shape. Frontend: `api.ts` exports a `BackendError`/`isBackendError` type guard for that shape and a matching `TaskPatch` interface; `tasksSlice.ts`'s `updateTaskTitle`/`toggleTaskState` now call `updateTask(id, { title })`/`updateTask(id, { state })`, and its `errorMessage` helper checks `isBackendError` so a real backend error message reaches the UI instead of always falling back to a generic string. New tests: `test_command_error_serializes_to_flat_kind_message_shape` (Rust); existing `update_task_impl` tests updated to the new signature.
+
+### M5. `Mutex::lock().unwrap()` everywhere — DONE
 
 All commands and the watcher callback unwrap the store mutex. One panic while holding the lock (e.g. from C4's parser) poisons it and every subsequent command panics, taking the app down.
 
 **Fix:** `lock().map_err(|_| CommandError::Store("state lock poisoned".into()))?` in commands; in the watcher callback, log and skip. (Or switch to `parking_lot::Mutex`, which doesn't poison.)
+
+**Done** — Added `lock_or_err(&Mutex<T>, name) -> Result<MutexGuard<T>, CommandError>` in `commands.rs` and used it at every production (non-test) `store`/`watcher`/`settings` lock site, mapping a poisoned lock to `CommandError::Store("{name} lock poisoned")` instead of panicking. In `file_watcher.rs`, the debounced-event callback and `FileWatcher::add_watched_folder`/`remove_watched_folder` now match on `.lock()` and `log::error!` + skip that event/file/removal on a poisoned lock rather than unwrapping. Test code still uses `.lock().unwrap()` — a panicking test failure there is fine, this was about production robustness.
 
 ### M6. Dead/junk files and dead dependencies — DONE
 
@@ -264,22 +274,30 @@ All commands and the watcher callback unwrap the store mutex. One panic while ho
 - Unused crates: `regex`, `log` (backend logs via `eprintln!`), `thiserror` (see M4), `tauri-plugin-log` (only registered in the dead `lib.rs` builder — after C6 it becomes live; then replace `eprintln!` with `log::error!`). **Done** — `regex` removed (no usages); `tauri-plugin-log` is now live via C6 and `file_watcher.rs`'s two `eprintln!` calls were switched to `log::error!`. `thiserror` intentionally left in place, still unused, pending the `CommandError`/`ParserError` derive work in M4.
 - `commands.rs:14-19` TODO comment claims handlers are unimplemented; stale relative to reality — update or remove alongside H3. **Done** — removed (the handlers already exist below it; H3 tracks making them actually persist).
 
-### M7. Fake UI elements that mislead during development
+### M7. Fake UI elements that mislead during development — DONE
 
 - `UpdatePrompt` renders "A new version is available!" unconditionally on every launch (`App.tsx:15,45`) with a no-op Update button. Remove it until you integrate `tauri-plugin-updater` (note: auto-update inside Flatpak is handled by Flathub anyway — this component may never be needed for your target).
 - `RefileDialog` searches three hardcoded fake targets; `Toolbar`'s dropdown items are `console.log` stubs; `SettingsDialog` adds fake folder paths. Fine as scaffolding, but each should either be wired (RefileDialog → real file list from backend; folders → H5) or visibly marked disabled so testing doesn't chase ghosts.
 
-### M8. Quick-capture IDs can collide and never reach disk
+**Done** — `UpdatePrompt.tsx` deleted and its usage removed from `App.tsx` (no real updater is wired up, so a permanent "update available" banner was pure noise). `Toolbar`'s dropdown items ("File > New/Open", "Edit > Undo", "Help > About") are now `disabled` (new `disabled` prop on `DropdownItem`, styled greyed-out and inert via Radix's `data-[disabled]`) instead of a `console.log` stub plus three silent no-ops. `RefileDialog` now searches real distinct source-file paths collected from the currently loaded tasks (`useTasksSlice`) instead of three hardcoded filenames. `SettingsDialog`'s folder picker was already wired to real folders in H5.
+
+### M8. Quick-capture IDs can collide and never reach disk — DONE
 
 `QuickCaptureModal.tsx:13` uses `new Date().toISOString()` as the task id — two quick adds in the same millisecond collide, and React keys/toggles then misbehave. Use `crypto.randomUUID()` for the optimistic id, and replace it with the backend-assigned id once `create_task` persists (H3/H4).
 
-### M9. `(state: any)` selectors defeat TypeScript
+**Done** — Already resolved as a side effect of H4: `QuickCaptureModal` no longer invents any local id at all — it calls `addTask(title)`, which persists through `create_task` and refetches, so every task's id always comes from the backend. No change needed here.
+
+### M9. `(state: any)` selectors defeat TypeScript — DONE
 
 `App.tsx:16` and `QuickCaptureModal.tsx:6` use `useTasksSlice((state: any) => ...)`. The store is fully typed — remove the `any` so renames/refactors stay checked.
 
-### M10. Content Security Policy disabled
+**Done** — Both call sites were already clean (fixed as part of H4). Found and fixed one more instance of the same pattern the finding didn't call out by line: `AgendaBuilderDialog.tsx:6`'s `useAgendaSlice((state: any) => state.addPreset)` → `useAgendaSlice((state) => state.addPreset)`.
+
+### M10. Content Security Policy disabled — DONE
 
 `tauri.conf.json:26`: `"csp": null`. Before shipping (especially as a Flatpak), set a restrictive CSP, e.g. `"default-src 'self'; style-src 'self' 'unsafe-inline'"` — Tauri injects the right nonces for its own IPC. Do this early; retrofitting CSP after adding features is painful.
+
+**Done** — `tauri.conf.json`'s `app.security.csp` set to `"default-src 'self'; style-src 'self' 'unsafe-inline'"` exactly as suggested.
 
 ---
 

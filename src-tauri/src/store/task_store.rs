@@ -21,10 +21,16 @@ impl TaskStore {
         }
     }
 
+    /// Only headlines with a todo keyword become tasks — a plain note
+    /// headline (no TODO/DONE/... keyword) has no `todo_state` and would
+    /// otherwise default to `TodoState::Todo` in `Task::new`, showing up as
+    /// an open task even though it's just a note (see M1 in the code
+    /// review).
     pub fn add_tasks_from_file(&mut self, parsed_file: ParsedOrgFile) {
         let entries = parsed_file
             .headlines
             .iter()
+            .filter(|h| h.todo_state.is_some())
             .map(|h| (Task::new(h, &parsed_file.file_path), h.clone()))
             .collect();
         self.tasks_by_file
@@ -185,6 +191,23 @@ mod tests {
         let remaining = store.get_all_tasks();
         assert_eq!(remaining.len(), 2);
         assert!(remaining.iter().all(|t| t.file_path != other_file));
+    }
+
+    #[test]
+    fn test_plain_note_headlines_are_not_materialized_as_tasks() {
+        let parser = OrgParser::new();
+        let file_content = "* TODO Real task\n* Just a note, no keyword\n** Another note\n";
+        let parsed_file = ParsedOrgFile {
+            file_path: "notes.org".to_string(),
+            content: file_content.to_string(),
+            headlines: parser.parse_content(file_content).unwrap(),
+        };
+        let mut store = TaskStore::new();
+        store.add_tasks_from_file(parsed_file);
+
+        let tasks = store.get_all_tasks();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].title, "Real task");
     }
 
     #[test]
