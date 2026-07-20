@@ -32,10 +32,19 @@ export async function parseOrgContent(content: string): Promise<any> {
   }
 }
 
+export async function addWatchedFolder(path: string): Promise<string[]> {
+  return invoke<string[]>('add_watched_folder', { path });
+}
+
+export async function removeWatchedFolder(path: string): Promise<string[]> {
+  return invoke<string[]>('remove_watched_folder', { path });
+}
+
+export async function getWatchedFolders(): Promise<string[]> {
+  return invoke<string[]>('get_watched_folders');
+}
+
 // TODO: Define other IPC functions as needed, e.g.:
-// - getTasks()
 // - createTask(taskData)
 // - updateTask(taskId, taskData)
-// - deleteTask(taskId)
-// - getSettings()
-// - saveSettings(settings) 
+// - deleteTask(taskId) 

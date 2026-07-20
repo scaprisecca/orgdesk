@@ -130,6 +130,26 @@ impl OrgParser {
             .unwrap_or(false)
     }
 
+    /// Best-effort normalized form of `path` for use as a stable `TaskStore`
+    /// key. Canonicalizes `path` directly when it still exists (the common
+    /// case: initial scan, create/modify events); when it doesn't (a Remove
+    /// event, where the file itself is already gone) canonicalizes the
+    /// parent directory instead and rejoins the file name, so the key still
+    /// matches whatever `parse_file` inserted it under.
+    pub fn normalize_path<P: AsRef<Path>>(path: P) -> String {
+        let path = path.as_ref();
+        if let Ok(canonical) = fs::canonicalize(path) {
+            return canonical.to_string_lossy().to_string();
+        }
+        match (
+            path.parent().and_then(|p| fs::canonicalize(p).ok()),
+            path.file_name(),
+        ) {
+            (Some(parent), Some(name)) => parent.join(name).to_string_lossy().to_string(),
+            _ => path.to_string_lossy().to_string(),
+        }
+    }
+
     /// Parse content string into a list of headlines using orgize
     pub fn parse_content(&self, content: &str) -> Result<Vec<OrgHeadline>, ParserError> {
         let config = ParseConfig {

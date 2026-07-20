@@ -23,6 +23,7 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.6.2", features = [] }
 tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
 # OrgDesk specific dependencies
 orgize = { version = "0.10.0-alpha.10", features = ["chrono", "indexmap"] }
 chrono = "0.4"

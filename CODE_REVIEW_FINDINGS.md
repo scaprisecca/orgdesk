@@ -185,7 +185,7 @@ Consequences: a `DONE` task never renders as done (`'Done' !== 'DONE'`); the age
 3. Add `createTask`, `updateTask`, `deleteTask`, `getAgendaRange` wrappers in `api.ts` with real types (no `Promise<any>`).
 4. Listen for a backend "tasks changed" event (H6) to refresh after watcher reconciliation.
 
-### H5. File watching is wrong-scope and disconnected from settings; no initial scan
+### H5. File watching is wrong-scope and disconnected from settings; no initial scan — DONE
 
 - `main.rs:19` watches `"."` — the process cwd. Under `cargo tauri dev` that's `src-tauri/`, so it recursively watches the Cargo `target/` build tree (thousands of files) and none of your actual org folders. In a packaged Flatpak the cwd is undefined/read-only.
 - `settingsSlice.ts` has `watchedFolders`, but it never reaches the backend, isn't persisted, and `SettingsDialog.tsx:10-14` adds a fake path instead of opening a folder picker.
@@ -198,11 +198,15 @@ Consequences: a `DONE` task never renders as done (`'Done' !== 'DONE'`); the age
 4. Use Tauri's dialog plugin (`tauri-plugin-dialog`) for a real native folder picker in `SettingsDialog`.
 5. Normalize paths (canonicalize) before using them as `TaskStore` keys — today a file parsed as `./notes.org` and modified as `/abs/path/notes.org` would occupy two different keys in `tasks_by_file`.
 
-### H6. Watcher changes never reach the UI
+**Done** — `FileWatcher` now tracks its own `watched_folders: Vec<PathBuf>` and exposes `add_watched_folder`/`remove_watched_folder`/`watched_folders()`; `add_watched_folder` canonicalizes the path, recursively scans for `*.org` files (hand-rolled walk, no new dependency), parses each into the store, then starts watching. New commands `add_watched_folder`/`remove_watched_folder`/`get_watched_folders` are wired through `AppState.watcher: Arc<Mutex<FileWatcher>>`. Settings persist as JSON (`src-tauri/src/settings.rs`, `Settings::load`/`save`) to `app_config_dir()/settings.json` (plain file rather than `tauri-plugin-store`, per the fix's own "or" option); `lib.rs::run()`'s `.setup()` loads it and re-scans/re-watches each saved folder on startup. `tauri-plugin-dialog` is registered and used from `SettingsDialog.tsx` for a real native folder picker (with a Remove button per folder). Path normalization is centralized in `OrgParser::normalize_path` (canonicalizes the file itself when it exists, else its parent + file name) and used by both `parse_file` and the watcher's Remove-event handling, so create/modify/remove/initial-scan all key the store consistently; `TaskStore::remove_tasks_by_folder` drops everything under a removed folder's canonical prefix.
+
+### H6. Watcher changes never reach the UI — DONE
 
 The debouncer callback (`watcher/file_watcher.rs:26-53`) updates the store but nothing tells the webview. The frontend fetches tasks exactly once on mount (`App.tsx:18-20`), so external edits (Emacs, syncthing, etc.) are invisible until restart.
 
 **Fix:** pass an `AppHandle` into `FileWatcher::new` (obtainable in `.setup(|app| ...)` after C6) and `app_handle.emit("tasks-changed", ())` after each store mutation. In the frontend, `listen('tasks-changed', () => fetchTasks())` from `@tauri-apps/api/event` inside a `useEffect`.
+
+**Done** — `FileWatcher::new` takes a generic `on_change: impl Fn() + Send + Sync + 'static` callback (kept tauri-agnostic so the watcher stays unit-testable without a running app) fired after any debounced batch actually mutates the store; `lib.rs::run()`'s `.setup()` supplies `move || { let _ = app_handle.emit(TASKS_CHANGED_EVENT, ()); }`. The `add_watched_folder`/`remove_watched_folder` commands also emit `tasks-changed` directly after their synchronous scan/unwatch. `App.tsx` now `listen('tasks-changed', () => fetchTasks())` inside a `useEffect` (with proper unlisten cleanup).
 
 ---
 

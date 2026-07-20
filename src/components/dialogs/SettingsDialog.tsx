@@ -1,15 +1,17 @@
+import { open } from '@tauri-apps/plugin-dialog';
 import { useUiSlice, useSettingsSlice } from '../../stores';
 
 export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const { isVimMode, toggleVimMode } = useUiSlice();
-  const { watchedFolders, addWatchedFolder } = useSettingsSlice();
+  const { watchedFolders, addWatchedFolder, removeWatchedFolder } = useSettingsSlice();
 
   if (!isOpen) return null;
 
-  const handleAddFolder = () => {
-    // In a real app, this would open a native file dialog.
-    // For now, we'll just add a mock path.
-    addWatchedFolder(`/path/to/new/folder/${Date.now()}`);
+  const handleAddFolder = async () => {
+    const folder = await open({ directory: true, multiple: false });
+    if (typeof folder === 'string') {
+      await addWatchedFolder(folder);
+    }
   };
 
   return (
@@ -35,8 +37,18 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: 
           <div>
             <h4 className="font-semibold mb-2">Watched Folders</h4>
             <div className="p-4 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-              <ul className="mb-2">
-                {watchedFolders.map(folder => <li key={folder} className="text-sm font-mono">{folder}</li>)}
+              <ul className="mb-2 space-y-1">
+                {watchedFolders.map(folder => (
+                  <li key={folder} className="flex items-center justify-between gap-2 text-sm font-mono">
+                    <span className="truncate">{folder}</span>
+                    <button
+                      onClick={() => removeWatchedFolder(folder)}
+                      className="shrink-0 text-xs text-red-600 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
               </ul>
               <button
                 onClick={handleAddFolder}

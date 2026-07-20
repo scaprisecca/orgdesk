@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { MainLayout } from './components/layout/MainLayout';
 import { Toolbar } from './components/Toolbar';
 import { TaskListPane } from './components/TaskListPane';
@@ -8,15 +9,26 @@ import { RefileDialog } from './components/dialogs/RefileDialog';
 import { AgendaBuilderDialog } from './components/dialogs/AgendaBuilderDialog';
 import { SettingsDialog } from './components/dialogs/SettingsDialog';
 import { UpdatePrompt } from './components/ui/UpdatePrompt';
-import { useUiSlice, useTasksSlice } from './stores';
+import { useUiSlice, useTasksSlice, useSettingsSlice } from './stores';
 
 function App() {
   const { activeModal, closeModal } = useUiSlice();
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(true);
-  const fetchTasks = useTasksSlice((state: any) => state.fetchTasks);
+  const fetchTasks = useTasksSlice((state) => state.fetchTasks);
+  const fetchWatchedFolders = useSettingsSlice((state) => state.fetchWatchedFolders);
 
   useEffect(() => {
     fetchTasks();
+    fetchWatchedFolders();
+  }, [fetchTasks, fetchWatchedFolders]);
+
+  useEffect(() => {
+    const unlisten = listen('tasks-changed', () => {
+      fetchTasks();
+    });
+    return () => {
+      unlisten.then((stopListening) => stopListening());
+    };
   }, [fetchTasks]);
 
   return (

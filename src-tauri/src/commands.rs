@@ -4,12 +4,14 @@
 use crate::{
     models::task::{Task, TodoState},
     parser::org_parser::{OrgHeadline, OrgParser, ParsedOrgFile, ParserError},
+    settings::Settings,
     store::task_store::TaskStore,
+    watcher::file_watcher::{FileWatcher, TASKS_CHANGED_EVENT},
 };
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 // Placeholder function to ensure compilation
 #[tauri::command]
@@ -65,6 +67,17 @@ impl From<String> for CommandError {
 pub struct AppState {
     pub store: Arc<Mutex<TaskStore>>,
     pub parser: Arc<OrgParser>,
+    pub watcher: Arc<Mutex<FileWatcher>>,
+    pub settings_path: PathBuf,
+}
+
+fn persist_watched_folders(settings_path: &Path, watched_folders: Vec<String>) {
+    let settings = Settings {
+        watched_folders,
+    };
+    if let Err(e) = settings.save(settings_path) {
+        log::error!("Failed to save settings to {:?}: {:?}", settings_path, e);
+    }
 }
 
 #[tauri::command]
@@ -154,4 +167,48 @@ pub fn get_agenda_range(
 ) -> Result<Vec<Task>, CommandError> {
     // TODO: Implement date parsing and filtering
     Ok(vec![])
+}
+
+/// Starts watching `path` (after a synchronous recursive scan for `.org`
+/// files to populate the store immediately — see `FileWatcher::add_watched_folder`),
+/// persists it to disk so it's restored on next launch, and notifies the
+/// frontend that tasks may have changed. Returns the full watched-folder list.
+#[tauri::command]
+pub fn add_watched_folder(
+    path: String,
+    app_handle: AppHandle,
+    state: State<AppState>,
+) -> Result<Vec<String>, CommandError> {
+    let mut watcher = state.watcher.lock().unwrap();
+    watcher
+        .add_watched_folder(Path::new(&path))
+        .map_err(|e| CommandError::Store(e.to_string()))?;
+
+    let folders = watcher.watched_folders();
+    persist_watched_folders(&state.settings_path, folders.clone());
+    let _ = app_handle.emit(TASKS_CHANGED_EVENT, ());
+    Ok(folders)
+}
+
+/// Stops watching `path` and drops every task parsed from underneath it,
+/// persists the updated folder list, and notifies the frontend. Returns the
+/// full watched-folder list.
+#[tauri::command]
+pub fn remove_watched_folder(
+    path: String,
+    app_handle: AppHandle,
+    state: State<AppState>,
+) -> Result<Vec<String>, CommandError> {
+    let mut watcher = state.watcher.lock().unwrap();
+    watcher.remove_watched_folder(Path::new(&path));
+
+    let folders = watcher.watched_folders();
+    persist_watched_folders(&state.settings_path, folders.clone());
+    let _ = app_handle.emit(TASKS_CHANGED_EVENT, ());
+    Ok(folders)
+}
+
+#[tauri::command]
+pub fn get_watched_folders(state: State<AppState>) -> Result<Vec<String>, CommandError> {
+    Ok(state.watcher.lock().unwrap().watched_folders())
 } 

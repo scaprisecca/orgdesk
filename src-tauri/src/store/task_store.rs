@@ -1,6 +1,7 @@
 use crate::models::task::Task;
 use crate::parser::org_parser::{OrgHeadline, ParsedOrgFile};
 use std::collections::HashMap;
+use std::path::Path;
 use uuid::Uuid;
 
 /// A task plus the `OrgHeadline` it was parsed from. The headline's
@@ -34,6 +35,15 @@ impl TaskStore {
         self.tasks_by_file
             .remove(file_path)
             .map(|entries| entries.into_iter().map(|(task, _)| task).collect())
+    }
+
+    /// Drops every file whose (canonicalized) path is under `folder_path`,
+    /// e.g. when a watched folder is removed. `folder_path` is expected to
+    /// already be canonicalized, matching the keys `add_tasks_from_file`
+    /// inserts (see `OrgParser::normalize_path`).
+    pub fn remove_tasks_by_folder(&mut self, folder_path: &str) {
+        self.tasks_by_file
+            .retain(|file_path, _| !Path::new(file_path).starts_with(folder_path));
     }
 
     pub fn get_task(&self, task_id: Uuid) -> Option<&Task> {
@@ -153,6 +163,26 @@ mod tests {
         
         let remaining_task = tasks[0];
         assert_ne!(remaining_task.id, task_to_remove.id);
+    }
+
+    #[test]
+    fn test_remove_tasks_by_folder() {
+        let mut store = create_test_store(); // inserts under "test.org"
+        let parser = OrgParser::new();
+        let other_file = "/watched/folder/other.org";
+        let parsed_other = ParsedOrgFile {
+            file_path: other_file.to_string(),
+            content: "* TODO Other\n".to_string(),
+            headlines: parser.parse_content("* TODO Other\n").unwrap(),
+        };
+        store.add_tasks_from_file(parsed_other);
+        assert_eq!(store.get_all_tasks().len(), 3);
+
+        store.remove_tasks_by_folder("/watched/folder");
+
+        let remaining = store.get_all_tasks();
+        assert_eq!(remaining.len(), 2);
+        assert!(remaining.iter().all(|t| t.file_path != other_file));
     }
 
     #[test]

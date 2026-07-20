@@ -1,4 +1,9 @@
 import { create } from 'zustand';
+import {
+  addWatchedFolder as apiAddWatchedFolder,
+  removeWatchedFolder as apiRemoveWatchedFolder,
+  getWatchedFolders,
+} from '../lib/api';
 
 interface SettingsState {
   watchedFolders: string[];
@@ -6,8 +11,9 @@ interface SettingsState {
     todo: string;
     done: string;
   };
-  addWatchedFolder: (folderPath: string) => void;
-  removeWatchedFolder: (folderPath: string) => void;
+  fetchWatchedFolders: () => Promise<void>;
+  addWatchedFolder: (folderPath: string) => Promise<void>;
+  removeWatchedFolder: (folderPath: string) => Promise<void>;
   setTodoStateConfig: (config: { todo: string; done: string }) => void;
 }
 
@@ -17,13 +23,17 @@ export const useSettingsSlice = create<SettingsState>((set) => ({
     todo: 'TODO',
     done: 'DONE',
   },
-  addWatchedFolder: (folderPath) =>
-    set((state) => ({
-      watchedFolders: [...state.watchedFolders, folderPath],
-    })),
-  removeWatchedFolder: (folderPath) =>
-    set((state) => ({
-      watchedFolders: state.watchedFolders.filter((f) => f !== folderPath),
-    })),
+  fetchWatchedFolders: async () => {
+    const watchedFolders = await getWatchedFolders();
+    set({ watchedFolders });
+  },
+  addWatchedFolder: async (folderPath) => {
+    const watchedFolders = await apiAddWatchedFolder(folderPath);
+    set({ watchedFolders });
+  },
+  removeWatchedFolder: async (folderPath) => {
+    const watchedFolders = await apiRemoveWatchedFolder(folderPath);
+    set({ watchedFolders });
+  },
   setTodoStateConfig: (config) => set({ todoStateConfig: config }),
-})); 
+}));
