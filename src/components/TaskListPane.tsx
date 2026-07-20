@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useTasksSlice } from '../stores';
 import type { Task } from '../stores/tasksSlice';
+import { filterTasks } from '../lib/taskTree';
 
 const TaskItem = ({ task, level }: { task: Task, level: number }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -80,22 +81,6 @@ const TaskItem = ({ task, level }: { task: Task, level: number }) => {
       )}
     </>
   );
-};
-
-const filterTasks = (tasks: Task[], filterText: string): Task[] => {
-  if (!filterText) {
-    return tasks;
-  }
-
-  const lowercasedFilter = filterText.toLowerCase();
-
-  return tasks.reduce((acc: Task[], task) => {
-    const children = task.children ? filterTasks(task.children, filterText) : [];
-    if (task.title.toLowerCase().includes(lowercasedFilter) || children.length > 0) {
-      acc.push({ ...task, children });
-    }
-    return acc;
-  }, []);
 };
 
 export const TaskListPane = () => {

@@ -13,13 +13,19 @@
 - `src/components/AgendaPane.tsx`: The component for the 7-day agenda view.
 - `src/components/modals/QuickCaptureModal.tsx`: Modal for quickly adding new tasks.
 - `src/components/dialogs/RefileDialog.tsx`: Dialog for moving tasks using fuzzy search.
-- `tailwind.config.js`: Configuration file for Tailwind CSS.
-- `postcss.config.js`: Configuration file for PostCSS, required by Tailwind CSS.
+- `src/components/dialogs/SettingsDialog.tsx`: Dialog for editor, inbox file, and watched-folder settings.
+- `src/components/dialogs/AgendaBuilderDialog.tsx`: Dialog for creating agenda presets.
+- `src/components/ui/Dialog.tsx`: Shared Radix-based modal chrome (focus trap, Escape-to-close, scroll lock) used by all four modals/dialogs above.
+- `src/components/ui/Dropdown.tsx`: Shared Radix-based dropdown menu used by the Toolbar and AgendaPane.
+- `src/lib/api.ts`: Tauri IPC wrapper functions — the sole boundary between the frontend and Rust commands.
+- `src/lib/taskTree.ts`: Shared `Task`/`TodoState` types plus pure tree helpers (`buildTaskTree`, `findTask`, `mapTaskRecursively`, `removeTaskRecursively`, `filterTasks`) used by `tasksSlice.ts` and `TaskListPane.tsx`.
+- `postcss.config.js`: Configuration file for PostCSS, required by Tailwind CSS v4. (`tailwind.config.js` was removed — Tailwind v4 is CSS-first and auto-detects content; see `src/index.css`'s `@import "tailwindcss"`.)
+- `pnpm-workspace.yaml`: Declares `onlyBuiltDependencies` so `esbuild`/`@tailwindcss/oxide` install scripts run without an interactive `pnpm approve-builds` prompt on a fresh clone.
 
 ### Notes
 
 - Unit tests should typically be placed alongside the code files they are testing (e.g., `MyComponent.tsx` and `MyComponent.test.tsx` in the same directory).
-- Use `pnpm exec jest [optional/path/to/test/file]` to run tests. Running without a path executes all tests found by the Jest configuration.
+- Use `pnpm test [optional/path/to/test/file]` to run tests (Vitest, not Jest — see `vite.config.ts`'s `test` block). `pnpm test:watch` runs in watch mode.
 
 ## Tasks
 
@@ -50,7 +56,7 @@
   - [x] 5.2 Create placeholder `RefileDialog.tsx`.
   - [x] 5.3 Create placeholder `AgendaBuilderDialog.tsx`.
   - [x] 5.4 Create placeholder `SettingsDialog.tsx`.
-  - [x] 5.5 Create placeholder `UpdatePrompt.tsx`.
+  - [x] 5.5 ~~Create placeholder `UpdatePrompt.tsx`.~~ Later deleted (2026-07-20): it rendered "A new version is available!" unconditionally with a no-op button, and no real updater was ever wired up — see M7 in `CODE_REVIEW_FINDINGS.md`.
 - [x] 6.0 Integrate with Tauri IPC
   - [x] 6.1 Create `src/lib/api.ts` to house IPC wrapper functions.
   - [x] 6.2 Define placeholder functions for communicating with the Rust backend (e.g., `createTask`, `updateTask`).
@@ -74,11 +80,11 @@
   - [x] 10.4 Allow marking tasks as complete directly from the agenda view.
 - [x] 11.0 Implement Modals and Dialog Logic
   - [x] 11.1 **QuickCaptureModal:** Connect input to state and implement the `addTask` action on submit.
-  - [x] 11.2 **RefileDialog:** Implement fuzzy search with `Fuse.js` using mock data for refile targets.
+  - [x] 11.2 **RefileDialog:** Implement fuzzy search with `Fuse.js` — originally hardcoded mock refile targets, since replaced (2026-07-20) with the distinct source file paths of currently loaded tasks (see M7 in `CODE_REVIEW_FINDINGS.md`).
   - [x] 11.3 **AgendaBuilderDialog:** Connect inputs to state and implement the `addPreset` action on save.
   - [x] 11.4 **SettingsDialog:** Connect Vim mode toggle to `uiSlice` and "Add Folder" button to `settingsSlice`.
 - [x] 12.0 Connect State to Tauri Backend
   - [x] 12.1 Implement `getTasks` in `api.ts` and call it to populate the `tasksSlice` on app load.
   - [x] 12.2 Update `tasksSlice` `addTask` action to call the backend and use an optimistic update pattern.
   - [x] 12.3 Implement and connect `updateTask` and `deleteTask` actions in `tasksSlice` with optimistic updates.
-  - [x] 12.4 Implement and connect `getSettings` and `saveSettings` in `api.ts` to sync the `settingsSlice`. 
+  - [x] 12.4 Implement and connect settings sync in `api.ts`/`settingsSlice.ts` — done as separate per-setting commands rather than one `getSettings`/`saveSettings` pair: `getInboxFile`/`setInboxFile` and `getWatchedFolders`/`addWatchedFolder`/`removeWatchedFolder`.

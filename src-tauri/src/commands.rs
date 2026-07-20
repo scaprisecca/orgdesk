@@ -23,29 +23,34 @@ pub fn hello_from_rust(name: &str) -> String {
     format!("Hello, {}! You've successfully connected to Rust backend.", name)
 }
 
+// Both commands route through `state.parser` (rather than a fresh
+// `OrgParser::new()`) so that once `ParseConfig` is settings-driven (M2),
+// they automatically pick up the same todo keywords every other command
+// uses instead of silently parsing with stale defaults (see L3 in the code
+// review).
 #[tauri::command]
-pub fn parse_org_content(content: String) -> Result<Vec<OrgHeadline>, String> {
-    let parser = OrgParser::new();
-    
-    parser.parse_content(&content)
+pub fn parse_org_content(content: String, state: State<AppState>) -> Result<Vec<OrgHeadline>, String> {
+    state
+        .parser
+        .parse_content(&content)
         .map_err(|e| format!("Failed to parse org content: {}", e))
 }
 
 #[tauri::command]
-pub fn parse_org_file(file_path: String) -> Result<ParsedOrgFile, String> {
-    let parser = OrgParser::new();
-    
+pub fn parse_org_file(file_path: String, state: State<AppState>) -> Result<ParsedOrgFile, String> {
     // Check if it's a valid org file
     if !OrgParser::is_org_file(&file_path) {
         return Err("File is not a valid .org file".to_string());
     }
-    
+
     // Check if file exists
     if !Path::new(&file_path).exists() {
         return Err(format!("File does not exist: {}", file_path));
     }
-    
-    parser.parse_file(&file_path)
+
+    state
+        .parser
+        .parse_file(&file_path)
         .map_err(|e| format!("Failed to parse org file: {}", e))
 }
 
@@ -285,23 +290,15 @@ pub fn delete_task(
     Ok(removed)
 }
 
+// Filtering by title lives entirely on the frontend (`TaskListPane.tsx`'s
+// case-insensitive `filterTasks`, which the caller here — `getTasks()` in
+// `api.ts` — never bypasses), so this command just returns every task
+// rather than duplicating that logic case-sensitively (see L4 in the code
+// review).
 #[tauri::command]
-pub fn list_tasks(
-    filter: Option<String>,
-    state: State<AppState>,
-) -> Result<Vec<Task>, CommandError> {
+pub fn list_tasks(state: State<AppState>) -> Result<Vec<Task>, CommandError> {
     let store = lock_or_err(&state.store, "store")?;
-    let tasks = store
-        .filter_tasks(|task| {
-            if let Some(filter) = &filter {
-                task.title.contains(filter)
-            } else {
-                true
-            }
-        })
-        .into_iter()
-        .cloned()
-        .collect();
+    let tasks = store.get_all_tasks().into_iter().cloned().collect();
     Ok(tasks)
 }
 

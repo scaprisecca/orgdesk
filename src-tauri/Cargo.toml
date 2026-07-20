@@ -25,7 +25,7 @@ tauri = { version = "2.6.2", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 # OrgDesk specific dependencies
-orgize = { version = "0.10.0-alpha.10", features = ["chrono", "indexmap"] }
+orgize = { version = "=0.10.0-alpha.10", features = ["chrono", "indexmap"] }
 chrono = "0.4"
 notify = "6.1.1"
 thiserror = "1.0.58"

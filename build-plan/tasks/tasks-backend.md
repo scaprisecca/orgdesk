@@ -66,7 +66,7 @@ Based on the backend.md specification, here are the tasks required to implement 
   - [x] 5.1 Create command handlers module for Tauri IPC
   - [x] 5.2 Implement createTask command with JSON request/response
   - [x] 5.3 Implement updateTask and deleteTask commands
-  - [x] 5.4 Implement listTasks command with filtering support
+  - [x] 5.4 Implement `list_tasks` command — later simplified (2026-07-20) to return every task with no `filter` parameter, since the frontend's `TaskListPane` already does its own case-insensitive filtering client-side and never passed one; see L4 in `CODE_REVIEW_FINDINGS.md`. Filtering as a generic store capability still exists (`TaskStore::filter_tasks`, used by `get_agenda_range`).
   - [x] 5.5 Implement getAgendaRange command for date-based queries
   - [x] 5.6 Add proper error handling and JSON error responses
   - [x] 5.7 Wire all commands to Tauri app in main.rs
