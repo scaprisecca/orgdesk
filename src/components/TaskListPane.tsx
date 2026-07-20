@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { KeyboardEvent } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useTasksSlice } from '../stores';
 import type { Task } from '../stores/tasksSlice';
 
@@ -8,6 +9,7 @@ const TaskItem = ({ task, level }: { task: Task, level: number }) => {
   const [title, setTitle] = useState(task.title);
   const updateTaskTitle = useTasksSlice((state) => state.updateTaskTitle);
   const toggleTaskState = useTasksSlice((state) => state.toggleTaskState);
+  const removeTask = useTasksSlice((state) => state.removeTask);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,6 +63,13 @@ const TaskItem = ({ task, level }: { task: Task, level: number }) => {
             {task.title}
           </span>
         )}
+        <button
+          onClick={() => removeTask(task.id)}
+          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600"
+          aria-label={`Delete ${task.title}`}
+        >
+          <Trash2 size={16} />
+        </button>
       </li>
       {task.children && (
         <ul className="pl-4">

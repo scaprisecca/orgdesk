@@ -12,11 +12,38 @@ pub enum TodoState {
     Canceled,
 }
 
+impl TodoState {
+    /// The org todo keyword this state round-trips to, matching the parsing
+    /// in `Task::new`'s `match headline.todo_state.as_deref()`. Used when
+    /// writing a task's state back into an `OrgHeadline` for `update_task`.
+    pub fn as_org_keyword(&self) -> &'static str {
+        match self {
+            TodoState::Todo => "TODO",
+            TodoState::Done => "DONE",
+            TodoState::InProgress => "IN_PROGRESS",
+            TodoState::Someday => "SOMEDAY",
+            TodoState::Canceled => "CANCELED",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
     A,
     B,
     C,
+}
+
+impl Priority {
+    /// The org priority letter this round-trips to, matching the parsing in
+    /// `Task::new`'s `match headline.priority`.
+    pub fn as_char(&self) -> char {
+        match self {
+            Priority::A => 'A',
+            Priority::B => 'B',
+            Priority::C => 'C',
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -207,6 +234,49 @@ mod tests {
 
         assert_eq!(Task::new(&headlines[0], "notes.org").level, 1);
         assert_eq!(Task::new(&headlines[1], "notes.org").level, 2);
+    }
+
+    #[test]
+    fn test_todo_state_as_org_keyword() {
+        assert_eq!(TodoState::Todo.as_org_keyword(), "TODO");
+        assert_eq!(TodoState::Done.as_org_keyword(), "DONE");
+        assert_eq!(TodoState::InProgress.as_org_keyword(), "IN_PROGRESS");
+        assert_eq!(TodoState::Someday.as_org_keyword(), "SOMEDAY");
+        assert_eq!(TodoState::Canceled.as_org_keyword(), "CANCELED");
+    }
+
+    #[test]
+    fn test_todo_state_round_trips_through_org_keyword() {
+        // IN_PROGRESS/CANCELED aren't in `OrgParser`'s hardcoded keyword
+        // config yet (see M2 in the code review), so they can't round-trip
+        // through a real parse — only assert the states it currently
+        // recognizes as todo keywords.
+        for state in [TodoState::Todo, TodoState::Done, TodoState::Someday] {
+            let keyword = state.as_org_keyword();
+            let content = format!("* {} Task\n", keyword);
+            let headlines = OrgParser::new().parse_content(&content).unwrap();
+            assert_eq!(
+                Task::new(&headlines[0], "notes.org").state,
+                state,
+                "state {:?} did not round-trip through keyword {:?}",
+                state,
+                keyword
+            );
+        }
+    }
+
+    #[test]
+    fn test_priority_round_trips_through_org_char() {
+        for priority in [Priority::A, Priority::B, Priority::C] {
+            let content = format!("* TODO [#{}] Task\n", priority.as_char());
+            let headlines = OrgParser::new().parse_content(&content).unwrap();
+            assert_eq!(
+                Task::new(&headlines[0], "notes.org").priority,
+                Some(priority.clone()),
+                "priority {:?} did not round-trip",
+                priority
+            );
+        }
     }
 
     #[test]

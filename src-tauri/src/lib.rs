@@ -51,6 +51,7 @@ pub fn run() {
                 store: task_store.clone(),
                 parser: parser.clone(),
                 watcher: Arc::new(Mutex::new(watcher)),
+                settings: Arc::new(Mutex::new(settings)),
                 settings_path,
             });
 
@@ -67,7 +68,9 @@ pub fn run() {
             commands::get_agenda_range,
             commands::add_watched_folder,
             commands::remove_watched_folder,
-            commands::get_watched_folders
+            commands::get_watched_folders,
+            commands::get_inbox_file,
+            commands::set_inbox_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

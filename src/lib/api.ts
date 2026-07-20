@@ -8,17 +8,31 @@ import type { Task } from '../stores';
  */
 
 export async function getTasks(): Promise<Task[]> {
-  try {
-    // Assuming the backend returns data that matches the Task[] structure
-    const tasks = await invoke<Task[]>("list_tasks");
-    return tasks;
-  } catch (error) {
-    console.error("Error invoking list_tasks:", error);
-    // Return mock data on error for development purposes
-    return [
-      { id: 'mock1', title: 'Mock task from error', state: 'TODO', level: 1, tags: [], filePath: '' }
-    ];
-  }
+  return invoke<Task[]>("list_tasks");
+}
+
+export async function createTask(title: string): Promise<Task> {
+  return invoke<Task>('create_task', { title });
+}
+
+export async function updateTask(task: Task): Promise<Task> {
+  return invoke<Task>('update_task', { task });
+}
+
+export async function deleteTask(taskId: string): Promise<Task> {
+  return invoke<Task>('delete_task', { taskId });
+}
+
+export async function getAgendaRange(startDate: string, endDate: string): Promise<Task[]> {
+  return invoke<Task[]>('get_agenda_range', { startDate, endDate });
+}
+
+export async function getInboxFile(): Promise<string | null> {
+  return invoke<string | null>('get_inbox_file');
+}
+
+export async function setInboxFile(path: string): Promise<void> {
+  return invoke<void>('set_inbox_file', { path });
 }
 
 // Example function for parsing org content
@@ -42,9 +56,4 @@ export async function removeWatchedFolder(path: string): Promise<string[]> {
 
 export async function getWatchedFolders(): Promise<string[]> {
   return invoke<string[]>('get_watched_folders');
-}
-
-// TODO: Define other IPC functions as needed, e.g.:
-// - createTask(taskData)
-// - updateTask(taskId, taskData)
-// - deleteTask(taskId) 
+} 

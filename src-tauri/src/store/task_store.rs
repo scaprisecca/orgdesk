@@ -46,22 +46,24 @@ impl TaskStore {
             .retain(|file_path, _| !Path::new(file_path).starts_with(folder_path));
     }
 
-    pub fn get_task(&self, task_id: Uuid) -> Option<&Task> {
+    /// The stored `(Task, OrgHeadline)` pair for `task_id`, if any. Commands
+    /// that need both the IPC-facing task and the headline to rewrite on
+    /// disk (update/delete) should use this instead of two separate lookups.
+    pub fn get_entry(&self, task_id: Uuid) -> Option<&TaskEntry> {
         self.tasks_by_file
             .values()
             .flat_map(|entries| entries.iter())
             .find(|(task, _)| task.id == task_id)
-            .map(|(task, _)| task)
+    }
+
+    pub fn get_task(&self, task_id: Uuid) -> Option<&Task> {
+        self.get_entry(task_id).map(|(task, _)| task)
     }
 
     /// The `OrgHeadline` a task was parsed from — the source of the
-    /// `header_range` needed to rewrite it back to disk.
+    /// `range`/`header_range` needed to rewrite or delete it on disk.
     pub fn get_headline(&self, task_id: Uuid) -> Option<&OrgHeadline> {
-        self.tasks_by_file
-            .values()
-            .flat_map(|entries| entries.iter())
-            .find(|(task, _)| task.id == task_id)
-            .map(|(_, headline)| headline)
+        self.get_entry(task_id).map(|(_, headline)| headline)
     }
 
     pub fn get_all_tasks(&self) -> Vec<&Task> {
@@ -205,6 +207,18 @@ mod tests {
         let headline = store.get_headline(task.id).unwrap();
         assert_eq!(headline.title, task.title);
         assert!(headline.header_range.is_some());
+    }
+
+    #[test]
+    fn test_get_entry_returns_matching_task_and_headline() {
+        let store = create_test_store();
+        let task = store.get_all_tasks()[0].clone();
+
+        let (entry_task, entry_headline) = store.get_entry(task.id).unwrap();
+        assert_eq!(entry_task.id, task.id);
+        assert_eq!(entry_headline.title, task.title);
+
+        assert!(store.get_entry(Uuid::new_v4()).is_none());
     }
 
     #[test]

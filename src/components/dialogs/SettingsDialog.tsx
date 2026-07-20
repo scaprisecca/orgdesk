@@ -1,9 +1,9 @@
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { useUiSlice, useSettingsSlice } from '../../stores';
 
 export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const { isVimMode, toggleVimMode } = useUiSlice();
-  const { watchedFolders, addWatchedFolder, removeWatchedFolder } = useSettingsSlice();
+  const { watchedFolders, addWatchedFolder, removeWatchedFolder, inboxFile, setInboxFile } = useSettingsSlice();
 
   if (!isOpen) return null;
 
@@ -11,6 +11,17 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: 
     const folder = await open({ directory: true, multiple: false });
     if (typeof folder === 'string') {
       await addWatchedFolder(folder);
+    }
+  };
+
+  const handlePickInboxFile = async () => {
+    const path = await save({
+      title: 'Choose inbox file',
+      defaultPath: inboxFile ?? 'inbox.org',
+      filters: [{ name: 'Org files', extensions: ['org'] }],
+    });
+    if (path) {
+      await setInboxFile(path);
     }
   };
 
@@ -31,6 +42,21 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: 
                 checked={isVimMode}
                 onChange={toggleVimMode}
               />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-2">Quick Capture Inbox</h4>
+            <div className="p-4 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 flex items-center justify-between gap-2">
+              <span className="text-sm font-mono truncate">
+                {inboxFile ?? 'No inbox file set — Quick Capture will fail until one is chosen'}
+              </span>
+              <button
+                onClick={handlePickInboxFile}
+                className="shrink-0 px-3 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+              >
+                Choose
+              </button>
             </div>
           </div>
 

@@ -3,22 +3,16 @@ import { useTasksSlice } from '../../stores';
 
 export const QuickCaptureModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [title, setTitle] = useState('');
-  const addTask = useTasksSlice((state: any) => state.addTask);
+  const addTask = useTasksSlice((state) => state.addTask);
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (title.trim()) {
-      addTask({
-        id: new Date().toISOString(), // Temporary ID
-        title: title.trim(),
-        state: 'TODO',
-        level: 1,
-        tags: [],
-        filePath: '',
-      });
+      const capturedTitle = title.trim();
       setTitle('');
       onClose();
+      await addTask(capturedTitle);
     }
   };
 

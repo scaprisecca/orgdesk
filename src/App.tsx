@@ -15,12 +15,15 @@ function App() {
   const { activeModal, closeModal } = useUiSlice();
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(true);
   const fetchTasks = useTasksSlice((state) => state.fetchTasks);
+  const taskError = useTasksSlice((state) => state.error);
   const fetchWatchedFolders = useSettingsSlice((state) => state.fetchWatchedFolders);
+  const fetchInboxFile = useSettingsSlice((state) => state.fetchInboxFile);
 
   useEffect(() => {
     fetchTasks();
     fetchWatchedFolders();
-  }, [fetchTasks, fetchWatchedFolders]);
+    fetchInboxFile();
+  }, [fetchTasks, fetchWatchedFolders, fetchInboxFile]);
 
   useEffect(() => {
     const unlisten = listen('tasks-changed', () => {
@@ -33,6 +36,14 @@ function App() {
 
   return (
     <>
+      {taskError && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-red-600 text-white text-sm px-4 py-2 flex justify-between items-center">
+          <span>{taskError}</span>
+          <button onClick={() => useTasksSlice.setState({ error: null })} className="font-bold px-2">
+            ×
+          </button>
+        </div>
+      )}
       <MainLayout
         toolbar={<Toolbar />}
         taskList={<TaskListPane />}

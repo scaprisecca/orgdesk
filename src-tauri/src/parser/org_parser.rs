@@ -291,6 +291,27 @@ impl OrgParser {
         fs::write(file_path, org.to_org())?;
         Ok(())
     }
+
+    /// Removes a headline's entire subtree (header, planning, properties,
+    /// body text, and any nested child headlines — i.e. `range`, not just
+    /// `header_range`) from the file. Unlike `update_headline`, deleting the
+    /// full subtree is exactly what's wanted here.
+    pub fn delete_headline<P: AsRef<Path>>(
+        &self,
+        file_path: P,
+        headline: &OrgHeadline,
+    ) -> Result<(), ParserError> {
+        let Some(range) = headline.range else {
+            return Err(ParserError::Parse(
+                "Cannot delete headline without a valid range".to_string(),
+            ));
+        };
+
+        let mut org = orgize::Org::parse(&fs::read_to_string(&file_path)?);
+        org.replace_range(range, "");
+        fs::write(file_path, org.to_org())?;
+        Ok(())
+    }
 }
 
 impl Default for OrgParser {
@@ -465,6 +486,34 @@ mod tests {
         let reparsed = parser.parse_file(file_path).unwrap();
         assert_eq!(reparsed.headlines.len(), 2);
         assert_eq!(reparsed.headlines[1].title, "Child");
+
+        fs::remove_file(file_path).unwrap();
+    }
+
+    #[test]
+    fn test_delete_headline_removes_subtree_only() {
+        let parser = OrgParser::new();
+        let file_content = "* TODO Keep me\n* TODO Delete me\n  Some notes.\n** TODO Child\n* TODO Keep me too\n";
+        let file_path = "test_delete.org";
+        fs::write(file_path, file_content).unwrap();
+
+        let parsed_file = parser.parse_file(file_path).unwrap();
+        let to_delete = parsed_file.headlines[1].clone();
+        assert_eq!(to_delete.title, "Delete me");
+
+        parser.delete_headline(file_path, &to_delete).unwrap();
+
+        let updated_content = fs::read_to_string(file_path).unwrap();
+        assert!(!updated_content.contains("Delete me"));
+        assert!(!updated_content.contains("Some notes."));
+        assert!(!updated_content.contains("Child"));
+        assert!(updated_content.contains("Keep me"));
+        assert!(updated_content.contains("Keep me too"));
+
+        let reparsed = parser.parse_file(file_path).unwrap();
+        assert_eq!(reparsed.headlines.len(), 2);
+        assert_eq!(reparsed.headlines[0].title, "Keep me");
+        assert_eq!(reparsed.headlines[1].title, "Keep me too");
 
         fs::remove_file(file_path).unwrap();
     }

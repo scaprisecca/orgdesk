@@ -152,7 +152,7 @@ Consequences: a `DONE` task never renders as done (`'Done' !== 'DONE'`); the age
 2. When a headline has no `:ID:`, either (a) generate one and write it back into the file's properties drawer (this is exactly what Emacs `org-id` does), or (b) fall back to a deterministic id derived from `file_path + headline path/offset` (stable enough between edits, no file writes).
 3. Also store the headline's `range`/line info on `Task` (or keep an `OrgHeadline` alongside it in the store) so `update_task` can find the right headline to rewrite — today `From<&OrgHeadline>` throws the range away, which is why the file write-back in `commands.rs` was never finishable.
 
-### H3. `create_task` / `update_task` / `delete_task` don't persist anything; `get_agenda_range` returns `[]`
+### H3. `create_task` / `update_task` / `delete_task` don't persist anything; `get_agenda_range` returns `[]` — DONE
 
 `src-tauri/src/commands.rs`:
 - `create_task` (77–102) builds a `Task` and returns it; the store write is commented out and nothing is appended to any `.org` file. The task evaporates.
@@ -167,7 +167,14 @@ Consequences: a `DONE` task never renders as done (`'Done' !== 'DONE'`); the age
 4. `get_agenda_range`: parse `start_date`/`end_date` with `chrono::NaiveDate::parse_from_str(.., "%Y-%m-%d")`, and filter `store.get_all_tasks()` by parsed `scheduled`/`deadline` (after H1 step 2 those are real dates). Return an error for unparseable dates instead of `Ok(vec![])`.
 5. Add a store test + command test for each once implemented.
 
-### H4. Frontend mutations never call the backend, and errors are masked by mock data
+**Done** — All three commands, plus `get_agenda_range`, now go through the file first and reparse afterward (each has a testable `*_impl` helper taking `&AppState` directly, exercised in `commands.rs`'s new test module without needing a running Tauri app):
+- `create_task` appends `\n* TODO {title}\n` to a configurable **inbox file** (`Settings.inbox_file`, set via new `get_inbox_file`/`set_inbox_file` commands and a "Quick Capture Inbox" picker in `SettingsDialog` using `tauri-plugin-dialog`'s `save()`), creating the file/parent dirs on first use, then reparses that file and returns the task as parsed back from disk (so its id is the real persisted one).
+- `update_task` looks up the stored `OrgHeadline` via `TaskStore::get_entry` (a new combined accessor replacing two separate `get_task`/`get_headline` traversals), rewrites title/state/tags/priority into it via the now-safe `OrgParser::update_headline` (C4), and reparses the whole file afterward — not just the one task — so every other headline's stored range is refreshed too (a rewrite/delete shifts later byte offsets). `scheduled`/`deadline` are deliberately left untouched rather than regenerated from the ISO date, since the frontend doesn't edit them yet and doing so would silently drop repeaters like `+1w`. `TodoState::as_org_keyword`/`Priority::as_char` (new, with round-trip tests) do the state/priority round-trip back to org syntax.
+- `delete_task` uses a new `OrgParser::delete_headline` (removes the headline's full subtree `range`, unlike `update_headline`'s header-only range) and, like `update_task`, reparses the whole file afterward so surviving siblings' ranges don't go stale.
+- `get_agenda_range` parses `start_date`/`end_date` with `chrono::NaiveDate`, returns a `CommandError::Parser` for unparseable input instead of `Ok(vec![])`, and filters on real scheduled/deadline dates.
+- Note: headlines without an `:ID:` property still derive their id from file path + sibling-index (H2); deleting/inserting a preceding sibling shifts that index and thus the id of everything after it in the same file. This is an accepted limitation of the existing fallback-id design (not something H3 introduced) — the frontend's `tasks-changed`-triggered refetch (H6) means it never holds a stale id across a mutation in practice.
+
+### H4. Frontend mutations never call the backend, and errors are masked by mock data — DONE
 
 - `tasksSlice.ts` `addTask`/`updateTaskTitle`/`toggleTaskState` mutate only local state — no `invoke` ever happens, so nothing the user does reaches Rust or disk.
 - `src/lib/api.ts:15-21`: `getTasks()` catches any invoke failure and silently returns `[{ id: 'mock1', ... }]`. Combined with the above, the app can *look* like it works while the whole backend is unwired (which is exactly the current state).
@@ -184,6 +191,8 @@ Consequences: a `DONE` task never renders as done (`'Done' !== 'DONE'`); the age
    ```
 3. Add `createTask`, `updateTask`, `deleteTask`, `getAgendaRange` wrappers in `api.ts` with real types (no `Promise<any>`).
 4. Listen for a backend "tasks changed" event (H6) to refresh after watcher reconciliation.
+
+**Done** — `api.ts`'s `getTasks()` no longer swallows failures into mock data; it just lets the invoke error propagate. New typed wrappers `createTask`/`updateTask`/`deleteTask`/`getAgendaRange`/`getInboxFile`/`setInboxFile` were added (no `any`). `tasksSlice.ts`'s `addTask`/`updateTaskTitle`/`toggleTaskState`/(new) `removeTask` all now call the backend: title/state edits apply optimistically then persist, rolling the in-memory tree back to its pre-edit snapshot and setting a new `error: string | null` field on failure; `addTask` calls `createTask` then refetches (a create changes the task's id/position, so there's nothing sensible to apply optimistically). `App.tsx` renders a dismissible red banner when `tasksSlice.error` is set, and already listens for `tasks-changed` (H6) to refetch after watcher reconciliation. `Task` gained a `properties: Record<string, string>` field so edits round-trip a headline's existing properties (notably `:ID:`) instead of the update wiping them via a field the frontend type didn't know about. `QuickCaptureModal` now calls `addTask(title)` instead of inventing a fake local `Task` object with a timestamp id (incidentally also fixing its `(state: any)` selector, M9). `TaskListPane` grew a per-task delete button (using the now-working `removeTask`) since `delete_task` had no UI trigger otherwise.
 
 ### H5. File watching is wrong-scope and disconnected from settings; no initial scan — DONE
 
